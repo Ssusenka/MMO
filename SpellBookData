@@ -1,0 +1,56 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local remote = ReplicatedStorage:FindFirstChild("SpellBookRemote") or Instance.new("RemoteEvent", ReplicatedStorage)
+remote.Name = "SpellBookRemote"
+
+local function setupSpellBook(player)
+	local book = Instance.new("Folder")
+	book.Name = "SpellBook"
+	book.Parent = player
+
+	local class = Instance.new("StringValue")
+	class.Name = "SelectedClass"
+	class.Value = "Magic"
+	class.Parent = book
+
+	-- Složka pro ukládání Loadoutů
+	local loadouts = Instance.new("Folder")
+	loadouts.Name = "Loadouts"
+	loadouts.Parent = book
+
+	local classes = {"Magic", "Range", "Melee"}
+	for _, cName in ipairs(classes) do
+		local cFolder = Instance.new("Folder")
+		cFolder.Name = cName
+		cFolder.Parent = loadouts
+
+		local active = Instance.new("Folder")
+		active.Name = "ActiveSlots"
+		active.Parent = cFolder
+		for i = 1, 5 do Instance.new("StringValue", active).Name = "Slot" .. i end
+
+		local passive = Instance.new("Folder")
+		passive.Name = "PassiveSlots"
+		passive.Parent = cFolder
+		for i = 1, 2 do Instance.new("StringValue", passive).Name = "Slot" .. i end
+	end
+end
+
+remote.OnServerEvent:Connect(function(player, action, data)
+	local book = player:FindFirstChild("SpellBook")
+	if not book then return end
+
+	if action == "SelectClass" then
+		book.SelectedClass.Value = data
+	elseif action == "EquipSpell" then
+		local targetSlot = book.Loadouts[data.class].ActiveSlots:FindFirstChild("Slot"..data.index)
+		if targetSlot then targetSlot.Value = data.name end
+	elseif action == "EquipPassive" then
+		local targetSlot = book.Loadouts[data.class].PassiveSlots:FindFirstChild("Slot"..data.index)
+		if targetSlot then targetSlot.Value = data.name end
+	end
+end)
+
+Players.PlayerAdded:Connect(setupSpellBook)
+for _, p in pairs(Players:GetPlayers()) do setupSpellBook(p) end
