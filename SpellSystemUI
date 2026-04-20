@@ -1,0 +1,368 @@
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local pGui = player:WaitForChild("PlayerGui")
+
+-- BEZPEČNÉ NAČÍTÁNÍ DAT
+local spellBook = player:WaitForChild("SpellBook", 10)
+if not spellBook then return end
+local selectedClassObj = spellBook:WaitForChild("SelectedClass", 5)
+local loadoutsFolder = spellBook:WaitForChild("Loadouts", 5)
+local remote = ReplicatedStorage:WaitForChild("SpellBookRemote", 5)
+
+-- BEZPEČNÉ NAČTENÍ POHYBU
+local Controls = nil
+local function getControls()
+	if not Controls then
+		pcall(function()
+			local pScripts = player:WaitForChild("PlayerScripts", 2)
+			if pScripts then
+				local pModule = pScripts:WaitForChild("PlayerModule", 2)
+				if pModule then
+					Controls = require(pModule):GetControls()
+				end
+			end
+		end)
+	end
+	return Controls
+end
+
+-- ==========================================
+-- DATA A STYLY
+-- ==========================================
+local CLASSES = {"Magic", "Range", "Melee"}
+local SPELLS = {
+	["Magic"] = {"Fireball", "FrostNova", "Shield", "Blink", "Beam", "Heal", "Meteor"},
+	["Range"] = {"Arrow", "Poison", "Dash", "Trap", "Piercing", "Volley", "Sniper"},
+	["Melee"] = {"Slash", "Whirl", "Block", "Bash", "Charge", "Lifesteal", "Execute"}
+}
+local PASSIVES = {
+	["Magic"] = {"ManaFlow", "Focus", "ArcaneInt", "Wisdom", "Illusion", "Meditation"},
+	["Range"] = {"Agility", "EagleEye", "Swiftness", "Stealth", "Precision", "Acrobatics"},
+	["Melee"] = {"Vitality", "Strength", "Guardian", "HardSkin", "WarriorWill", "IronClad"}
+}
+
+local COLORS = {
+	HeaderBg = Color3.fromRGB(15, 15, 18),
+	PanelBg = Color3.fromRGB(22, 23, 27),
+	PanelTrans = 0.15,
+	SlotBg = Color3.fromRGB(25, 26, 32),
+	Stroke = Color3.fromRGB(45, 48, 55),
+	Text = Color3.fromRGB(240, 240, 240),
+	Highlight = Color3.fromRGB(75, 135, 220)
+}
+
+local function createCorner(parent, radius)
+	local c = Instance.new("UICorner", parent)
+	c.CornerRadius = UDim.new(0, radius or 6)
+	return c
+end
+
+local function applyStroke(obj)
+	local stroke = Instance.new("UIStroke", obj)
+	stroke.Color = COLORS.Stroke; stroke.Thickness = 1; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	return stroke
+end
+
+local function createText(parent, text, size, pos, align, fontSize, isTitle)
+	local txt = Instance.new("TextLabel", parent)
+	txt.Size = size; txt.Position = pos; txt.Text = text
+	txt.TextColor3 = COLORS.Text; txt.BackgroundTransparency = 1
+	txt.Font = isTitle and Enum.Font.GothamBlack or Enum.Font.GothamBold
+	txt.TextSize = fontSize or 14; txt.TextXAlignment = align or Enum.TextXAlignment.Center
+	return txt
+end
+
+-- ==========================================
+-- 1. HERNÍ HUD SPELL BAR
+-- ==========================================
+local hudGui = Instance.new("ScreenGui", pGui); hudGui.Name = "SpellHUD"
+hudGui.DisplayOrder = 5
+
+local gameplayBarFrame = Instance.new("Frame", hudGui)
+gameplayBarFrame.AnchorPoint = Vector2.new(0.5, 1)
+gameplayBarFrame.Position = UDim2.new(0.5, 0, 1, -20)
+gameplayBarFrame.Size = UDim2.new(0, 400, 0, 70)
+gameplayBarFrame.BackgroundTransparency = 1
+
+local hudList = Instance.new("UIListLayout", gameplayBarFrame)
+hudList.FillDirection = Enum.FillDirection.Horizontal; hudList.HorizontalAlignment = Enum.HorizontalAlignment.Center; hudList.Padding = UDim.new(0, 10)
+
+local gameplaySlots = {}
+for i = 1, 5 do
+	local slot = Instance.new("Frame", gameplayBarFrame)
+	slot.Size = UDim2.new(0, 60, 0, 60); slot.BackgroundColor3 = COLORS.SlotBg
+	createCorner(slot, 8) 
+
+	local keyBox = Instance.new("Frame", slot)
+	keyBox.Size = UDim2.new(0, 18, 0, 18); keyBox.Position = UDim2.new(0, 2, 0, 2); keyBox.BackgroundColor3 = Color3.fromRGB(15, 15, 15); createCorner(keyBox, 4)
+	createText(keyBox, tostring(i), UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), Enum.TextXAlignment.Center, 11, false)
+
+	local iconTxt = createText(slot, "", UDim2.new(1, -4, 1, -20), UDim2.new(0, 2, 0, 18), Enum.TextXAlignment.Center, 10, false); iconTxt.TextWrapped = true
+	gameplaySlots[i] = {slot, iconTxt}
+end
+
+-- ==========================================
+-- 2. FULLSCREEN MENU NA KLÁVESU K
+-- ==========================================
+local menuGui = Instance.new("ScreenGui", pGui); menuGui.Name = "SpellMenuGui"; menuGui.Enabled = false
+menuGui.DisplayOrder = 10; menuGui.IgnoreGuiInset = true 
+
+local dimBg = Instance.new("Frame", menuGui)
+dimBg.Size = UDim2.new(1, 0, 1, 0); dimBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0); dimBg.BackgroundTransparency = 0.5
+local blur = Instance.new("BlurEffect", game.Lighting); blur.Size = 15; blur.Enabled = false
+
+local header = Instance.new("Frame", dimBg)
+header.Size = UDim2.new(1, 0, 0, 50); header.BackgroundColor3 = COLORS.HeaderBg; header.BorderSizePixel = 0
+createText(header, "  SPELLBOOK", UDim2.new(0, 300, 1, 0), UDim2.new(0, 20, 0, 0), Enum.TextXAlignment.Left, 20, true)
+
+local closeBtn = Instance.new("TextButton", header)
+closeBtn.AnchorPoint = Vector2.new(1, 0.5); closeBtn.Position = UDim2.new(1, -20, 0.5, 0); closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.BackgroundColor3 = COLORS.SlotBg; closeBtn.Text = "X"; closeBtn.TextColor3 = COLORS.Text; closeBtn.Font = Enum.Font.GothamBold; closeBtn.TextSize = 16; 
+createCorner(closeBtn, 6); applyStroke(closeBtn)
+
+local contentArea = Instance.new("Frame", dimBg)
+contentArea.AnchorPoint = Vector2.new(0.5, 0.5); contentArea.Position = UDim2.new(0.5, 0, 0.5, 0) 
+contentArea.Size = UDim2.new(1, -60, 1, -200); contentArea.BackgroundTransparency = 1
+
+local contentLayout = Instance.new("UIListLayout", contentArea)
+contentLayout.FillDirection = Enum.FillDirection.Horizontal; contentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; contentLayout.Padding = UDim.new(0, 30)
+
+local function createMainPanel(widthScale)
+	local p = Instance.new("Frame", contentArea)
+	p.Size = UDim2.new(widthScale, 0, 1, 0); p.BackgroundColor3 = COLORS.PanelBg; p.BackgroundTransparency = COLORS.PanelTrans
+	createCorner(p, 8); applyStroke(p)
+	return p
+end
+
+local pClasses = createMainPanel(0.2)
+local lClasses = Instance.new("UIListLayout", pClasses); lClasses.Padding = UDim.new(0, 20); lClasses.HorizontalAlignment = Enum.HorizontalAlignment.Center; lClasses.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local pSpells = createMainPanel(0.48)
+createText(pSpells, "SPELLS", UDim2.new(1, -40, 0, 50), UDim2.new(0, 20, 0, 10), Enum.TextXAlignment.Left, 18, true)
+local gridSpells = Instance.new("Frame", pSpells); gridSpells.Size = UDim2.new(1, -40, 1, -70); gridSpells.Position = UDim2.new(0, 20, 0, 60); gridSpells.BackgroundTransparency = 1
+local gLayoutSpells = Instance.new("UIGridLayout", gridSpells); gLayoutSpells.CellSize = UDim2.new(0, 75, 0, 75); gLayoutSpells.CellPadding = UDim2.new(0, 15, 0, 15); gLayoutSpells.HorizontalAlignment = Enum.HorizontalAlignment.Center; gLayoutSpells.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local pPassives = createMainPanel(0.28)
+createText(pPassives, "PASSIVE SKILLS", UDim2.new(1, -40, 0, 50), UDim2.new(0, 20, 0, 10), Enum.TextXAlignment.Left, 18, true)
+local gridPassives = Instance.new("Frame", pPassives); gridPassives.Size = UDim2.new(1, -40, 0, 300); gridPassives.Position = UDim2.new(0, 20, 0, 60); gridPassives.BackgroundTransparency = 1
+local gLayoutPass = Instance.new("UIGridLayout", gridPassives); gLayoutPass.CellSize = UDim2.new(0, 75, 0, 75); gLayoutPass.CellPadding = UDim2.new(0, 15, 0, 15); gLayoutPass.HorizontalAlignment = Enum.HorizontalAlignment.Center; gLayoutPass.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local eqPassContainer = Instance.new("Frame", pPassives); eqPassContainer.AnchorPoint = Vector2.new(0.5, 1); eqPassContainer.Size = UDim2.new(1, 0, 0, 100); eqPassContainer.Position = UDim2.new(0.5, 0, 1, -20); eqPassContainer.BackgroundTransparency = 1
+local lEqPass = Instance.new("UIListLayout", eqPassContainer); lEqPass.FillDirection = Enum.FillDirection.Horizontal; lEqPass.HorizontalAlignment = Enum.HorizontalAlignment.Center; lEqPass.Padding = UDim.new(0, 25)
+
+local menuEqPassSlots = {}
+for i = 1, 2 do
+	local slot = Instance.new("Frame", eqPassContainer)
+	slot.Name = "EqPassSlot" .. i
+	slot.Size = UDim2.new(0, 75, 0, 75); slot.BackgroundColor3 = COLORS.SlotBg; slot.BackgroundTransparency = COLORS.PanelTrans
+	createCorner(slot, 6); applyStroke(slot)
+	local txt = createText(slot, "", UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), Enum.TextXAlignment.Center, 12, false); txt.TextWrapped = true
+	menuEqPassSlots[i] = txt
+end
+
+-- ==========================================
+-- 3. MENU SPELL BAR
+-- ==========================================
+local menuSpellBarFrame = Instance.new("Frame", dimBg)
+menuSpellBarFrame.AnchorPoint = Vector2.new(0.5, 1)
+menuSpellBarFrame.Position = UDim2.new(0.5, 0, 1, -40)
+menuSpellBarFrame.Size = UDim2.new(0, 500, 0, 85)
+menuSpellBarFrame.BackgroundColor3 = COLORS.PanelBg; menuSpellBarFrame.BackgroundTransparency = COLORS.PanelTrans
+createCorner(menuSpellBarFrame, 8); applyStroke(menuSpellBarFrame)
+
+local mHudList = Instance.new("UIListLayout", menuSpellBarFrame)
+mHudList.FillDirection = Enum.FillDirection.Horizontal; mHudList.HorizontalAlignment = Enum.HorizontalAlignment.Center; mHudList.VerticalAlignment = Enum.VerticalAlignment.Center; mHudList.Padding = UDim.new(0, 15)
+
+local menuHotbarSlots = {}
+for i = 1, 5 do
+	local slot = Instance.new("Frame", menuSpellBarFrame)
+	slot.Name = "HotbarSlot" .. i
+	slot.Size = UDim2.new(0, 65, 0, 65); slot.BackgroundColor3 = COLORS.SlotBg; slot.BackgroundTransparency = COLORS.PanelTrans
+	createCorner(slot, 6); applyStroke(slot)
+
+	local keyBox = Instance.new("Frame", slot)
+	keyBox.Size = UDim2.new(0, 20, 0, 20); keyBox.Position = UDim2.new(0, 4, 0, 4); keyBox.BackgroundColor3 = COLORS.HeaderBg; keyBox.BackgroundTransparency = 0.3
+	createCorner(keyBox, 4); applyStroke(keyBox)
+	createText(keyBox, tostring(i), UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), Enum.TextXAlignment.Center, 12, false)
+
+	local iconTxt = createText(slot, "", UDim2.new(1, -4, 1, -20), UDim2.new(0, 2, 0, 18), Enum.TextXAlignment.Center, 11, false); iconTxt.TextWrapped = true
+	menuHotbarSlots[i] = {slot, iconTxt}
+end
+
+-- ==========================================
+-- DRAG & DROP LOGIKA
+-- ==========================================
+local dragScreen = Instance.new("ScreenGui", pGui); dragScreen.Name = "DragGhostGui"; dragScreen.DisplayOrder = 100; dragScreen.IgnoreGuiInset = true
+local ghostIcon = Instance.new("TextLabel", dragScreen)
+ghostIcon.Size = UDim2.new(0, 75, 0, 75); ghostIcon.BackgroundColor3 = COLORS.Highlight; ghostIcon.BackgroundTransparency = 0.2; ghostIcon.TextColor3 = COLORS.Text; ghostIcon.Font = Enum.Font.GothamBold; ghostIcon.TextSize = 12; ghostIcon.TextWrapped = true; ghostIcon.Visible = false; createCorner(ghostIcon, 6); applyStroke(ghostIcon)
+
+local draggingItem = nil; local dragType = nil
+
+local function makeDraggable(parent, name, type)
+	local btn = Instance.new("TextButton", parent)
+	btn.BackgroundColor3 = COLORS.SlotBg; btn.BackgroundTransparency = COLORS.PanelTrans
+	createCorner(btn, 6); applyStroke(btn)
+	btn.Text = name; btn.TextColor3 = COLORS.Text; btn.Font = Enum.Font.GothamBold; btn.TextSize = 12; btn.TextWrapped = true
+
+	btn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			draggingItem = name; dragType = type
+			ghostIcon.Text = name; ghostIcon.Visible = true
+			ghostIcon.Position = UDim2.new(0, input.Position.X - 37, 0, input.Position.Y - 37)
+		end
+	end)
+end
+
+UIS.InputChanged:Connect(function(input)
+	if draggingItem and input.UserInputType == Enum.UserInputType.MouseMovement then
+		ghostIcon.Position = UDim2.new(0, input.Position.X - 37, 0, input.Position.Y - 37)
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if draggingItem and input.UserInputType == Enum.UserInputType.MouseButton1 then
+		ghostIcon.Visible = false
+		local dropPos = input.Position
+		local guisAtPos = pGui:GetGuiObjectsAtPosition(dropPos.X, dropPos.Y)
+
+		for _, gui in ipairs(guisAtPos) do
+			if dragType == "Spell" and gui.Name:match("^HotbarSlot(%d+)$") then
+				local index = tonumber(gui.Name:match("^HotbarSlot(%d+)$"))
+				remote:FireServer("EquipSpell", {index = index, name = draggingItem, class = selectedClassObj.Value})
+				break
+			elseif dragType == "Passive" and gui.Name:match("^EqPassSlot(%d+)$") then
+				local index = tonumber(gui.Name:match("^EqPassSlot(%d+)$"))
+				remote:FireServer("EquipPassive", {index = index, name = draggingItem, class = selectedClassObj.Value})
+				break
+			end
+		end
+		draggingItem = nil; dragType = nil
+	end
+end)
+
+local function refreshMenu()
+	for _, v in pairs(pClasses:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+	for _, v in pairs(gridSpells:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+	for _, v in pairs(gridPassives:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+
+	for _, cName in pairs(CLASSES) do
+		local btn = Instance.new("TextButton", pClasses)
+		btn.Size = UDim2.new(0.85, 0, 0, 60); btn.BackgroundColor3 = COLORS.SlotBg; btn.BackgroundTransparency = COLORS.PanelTrans
+		createCorner(btn, 6); applyStroke(btn)
+
+		btn.Text = string.upper(cName); btn.TextColor3 = COLORS.Text; btn.Font = Enum.Font.GothamBlack; btn.TextSize = 18
+		if selectedClassObj.Value == cName then 
+			btn.BackgroundColor3 = COLORS.Highlight; btn.BackgroundTransparency = 0.5
+		end
+		btn.MouseButton1Click:Connect(function() remote:FireServer("SelectClass", cName) end)
+	end
+
+	local curClass = selectedClassObj.Value
+	if SPELLS[curClass] then for _, sName in pairs(SPELLS[curClass]) do makeDraggable(gridSpells, sName, "Spell") end end
+	if PASSIVES[curClass] then for _, pName in pairs(PASSIVES[curClass]) do makeDraggable(gridPassives, pName, "Passive") end end
+end
+
+selectedClassObj.Changed:Connect(function() if menuGui.Enabled then refreshMenu() end end)
+
+-- ==========================================
+-- ELEGANTNÍ ZAVÍRÁNÍ A UKLÁDÁNÍ UI
+-- ==========================================
+local isKMenuOpen = false
+local hiddenGuis = {}
+
+local function setKMenuState(state)
+	if isKMenuOpen == state then return end
+	isKMenuOpen = state
+
+	menuGui.Enabled = isKMenuOpen
+	blur.Enabled = isKMenuOpen
+	hudGui.Enabled = not isKMenuOpen
+
+	local ctrl = getControls()
+
+	if isKMenuOpen then
+		if ctrl then ctrl:Disable() end
+
+		-- Uložíme a schováme ostatní UI
+		hiddenGuis = {}
+		for _, gui in ipairs(pGui:GetChildren()) do
+			if gui:IsA("ScreenGui") and gui ~= menuGui and gui ~= hudGui and gui.Name ~= "DragGhostGui" and gui.Name ~= "Chat" and gui.Name ~= "BubbleChat" then
+				if gui.Enabled then
+					table.insert(hiddenGuis, gui)
+					gui.Enabled = false
+				end
+			end
+		end
+		refreshMenu()
+	else
+		if ctrl then ctrl:Enable() end
+
+		-- Vrátíme UI zpět na obrazovku
+		for _, gui in ipairs(hiddenGuis) do
+			if gui and gui.Parent then
+				gui.Enabled = true
+			end
+		end
+		hiddenGuis = {}
+	end
+end
+
+closeBtn.MouseButton1Click:Connect(function() setKMenuState(false) end)
+
+-- ==========================================
+-- KLÁVESY A SPOJENÍ S HLÍDAČEM
+-- ==========================================
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+
+	if input.KeyCode == Enum.KeyCode.K then
+		-- HLÍDAČ: Zeptáme se, jestli není otevřené P menu. Pokud je, K se nezapne.
+		if player:GetAttribute("PMenuOpen") then return end 
+
+		setKMenuState(not isKMenuOpen)
+	end
+end)
+
+-- ==========================================
+-- UPDATE SLOTŮ
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+	local char = player.Character
+	local tool = char and char:FindFirstChildOfClass("Tool")
+	local curClass = selectedClassObj.Value
+	local weaponClass = tool and tool:GetAttribute("WeaponClass") or "None"
+	local isCorrect = (weaponClass == curClass)
+
+	local curLoadout = loadoutsFolder:FindFirstChild(curClass)
+	if not curLoadout then return end
+
+	for i = 1, 5 do
+		local sSlot = curLoadout.ActiveSlots:FindFirstChild("Slot"..i)
+		local sName = sSlot and sSlot.Value or ""
+
+		local gUI = gameplaySlots[i]
+		gUI[2].Text = sName
+		if isCorrect and sName ~= "" then
+			gUI[1].BackgroundTransparency = 0.2; gUI[2].TextTransparency = 0
+		else
+			gUI[1].BackgroundTransparency = 0.8; gUI[2].TextTransparency = 0.6
+		end
+
+		local mUI = menuHotbarSlots[i]
+		mUI[2].Text = sName
+		if sName ~= "" then
+			mUI[1].BackgroundTransparency = 0.2; mUI[2].TextTransparency = 0
+		else
+			mUI[1].BackgroundTransparency = COLORS.PanelTrans; mUI[2].TextTransparency = 0.6
+		end
+	end
+
+	for i = 1, 2 do 
+		local pSlot = curLoadout.PassiveSlots:FindFirstChild("Slot"..i)
+		menuEqPassSlots[i].Text = pSlot and pSlot.Value or ""
+	end
+end)
