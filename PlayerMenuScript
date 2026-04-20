@@ -1,0 +1,962 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local StarterGui = game:GetService("StarterGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local pGui = player:WaitForChild("PlayerGui")
+local PlayerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+
+local updateGearEvent = ReplicatedStorage:WaitForChild("UpdateGearEvent")
+
+local blur = Lighting:FindFirstChild("MenuBlur") or Instance.new("BlurEffect")
+blur.Name = "MenuBlur"
+blur.Size = 0
+blur.Parent = Lighting
+
+pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end)
+
+local function applyStyle(ui)
+	Instance.new("UICorner", ui).CornerRadius = UDim.new(0, 8)
+	local s = Instance.new("UIStroke", ui)
+	s.Color = Color3.fromRGB(45, 50, 65)
+	s.Thickness = 1.5
+end
+
+-- ==========================================
+-- 1. HLAVN� MENU (P)
+-- ==========================================
+local menuGui = Instance.new("ScreenGui")
+menuGui.Name = "PlayerMenuGui"
+menuGui.ResetOnSpawn = false
+menuGui.Enabled = false
+menuGui.IgnoreGuiInset = true 
+menuGui.DisplayOrder = 100 
+menuGui.Parent = pGui
+
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.fromRGB(8, 10, 14)
+bg.BackgroundTransparency = 0.25
+bg.Parent = menuGui
+
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(1, 0, 0, 60)
+topBar.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+topBar.BackgroundTransparency = 0.1
+topBar.BorderSizePixel = 0
+topBar.Parent = bg
+
+local topBarLine = Instance.new("Frame")
+topBarLine.Size = UDim2.new(1, 0, 0, 1)
+topBarLine.Position = UDim2.new(0, 0, 1, 0)
+topBarLine.BackgroundColor3 = Color3.fromRGB(40, 45, 60)
+topBarLine.BorderSizePixel = 0
+topBarLine.Parent = topBar
+
+local mainTitle = Instance.new("TextLabel")
+mainTitle.Size = UDim2.new(0, 300, 1, 0)
+mainTitle.Position = UDim2.new(0, 30, 0, 0)
+mainTitle.BackgroundTransparency = 1
+mainTitle.Text = "CHARACTER MENU"
+mainTitle.TextColor3 = Color3.fromRGB(220, 225, 240)
+mainTitle.Font = Enum.Font.GothamBlack
+mainTitle.TextSize = 20
+mainTitle.TextXAlignment = Enum.TextXAlignment.Left
+mainTitle.Parent = topBar
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0, 40, 0, 40)
+close.Position = UDim2.new(1, -50, 0, 10)
+close.BackgroundColor3 = Color3.fromRGB(25, 28, 35)
+close.Text = "X"
+close.TextColor3 = Color3.fromRGB(200, 205, 220)
+close.Font = Enum.Font.GothamBold
+close.TextSize = 18
+close.Parent = topBar
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", close).Color = Color3.fromRGB(50, 55, 70)
+
+close.MouseEnter:Connect(function() close.TextColor3 = Color3.fromRGB(255, 255, 255) end)
+close.MouseLeave:Connect(function() close.TextColor3 = Color3.fromRGB(200, 205, 220) end)
+
+local statsFrame = Instance.new("Frame")
+statsFrame.Size = UDim2.new(0.22, 0, 0.75, 0)
+statsFrame.Position = UDim2.new(0.04, 0, 0.15, 0)
+statsFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+statsFrame.BackgroundTransparency = 0.1
+statsFrame.Parent = bg
+applyStyle(statsFrame)
+
+local statsPadding = Instance.new("UIPadding", statsFrame)
+statsPadding.PaddingLeft = UDim.new(0, 20)
+statsPadding.PaddingRight = UDim.new(0, 20)
+statsPadding.PaddingTop = UDim.new(0, 15)
+
+local statsTitle = Instance.new("TextLabel")
+statsTitle.Size = UDim2.new(1, 0, 0, 35)
+statsTitle.BackgroundTransparency = 1
+statsTitle.Text = "ATTRIBUTES"
+statsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+statsTitle.Font = Enum.Font.GothamBold
+statsTitle.TextSize = 16
+statsTitle.TextXAlignment = Enum.TextXAlignment.Left
+statsTitle.Parent = statsFrame
+
+local statsLayout = Instance.new("UIListLayout")
+statsLayout.Padding = UDim.new(0, 5)
+statsLayout.Parent = statsFrame
+
+local statLabels = {}
+local function createStatRow(name)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 35)
+	row.BackgroundTransparency = 1
+	row.Parent = statsFrame
+
+	local nameLbl = Instance.new("TextLabel")
+	nameLbl.Size = UDim2.new(0.5, 0, 1, 0)
+	nameLbl.BackgroundTransparency = 1
+	nameLbl.Text = name
+	nameLbl.TextColor3 = Color3.fromRGB(150, 155, 170)
+	nameLbl.Font = Enum.Font.GothamMedium
+	nameLbl.TextSize = 14
+	nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+	nameLbl.Parent = row
+
+	local valLbl = Instance.new("TextLabel")
+	valLbl.Size = UDim2.new(0.5, 0, 1, 0)
+	valLbl.Position = UDim2.new(0.5, 0, 0, 0)
+	valLbl.BackgroundTransparency = 1
+	valLbl.Text = "0"
+	valLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+	valLbl.Font = Enum.Font.GothamBold
+	valLbl.TextSize = 16
+	valLbl.TextXAlignment = Enum.TextXAlignment.Right
+	valLbl.Parent = row
+
+	local line = Instance.new("Frame")
+	line.Size = UDim2.new(1, 0, 0, 1)
+	line.Position = UDim2.new(0, 0, 1, 0)
+	line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	line.BackgroundTransparency = 0.95
+	line.BorderSizePixel = 0
+	line.Parent = row
+
+	return valLbl
+end
+
+local spacer = Instance.new("Frame", statsFrame) spacer.Size = UDim2.new(1,0,0,10) spacer.BackgroundTransparency = 1
+statLabels.MaxHealth = createStatRow("Max Health")
+statLabels.HealthRegen = createStatRow("HealthRegen")
+statLabels.MaxMana = createStatRow("Max Mana")
+statLabels.ManaRegen = createStatRow("Mana Regen")
+statLabels.Strength = createStatRow("Strength")
+statLabels.CritChance = createStatRow("Crit Chance")
+statLabels.CritDamage = createStatRow("Crit Damage")
+
+local function updateStats()
+	local s = player:FindFirstChild("RPGStats")
+	if s then
+		statLabels.MaxHealth.Text = s:FindFirstChild("MaxHealth") and tostring(s.MaxHealth.Value) or "0"
+		statLabels.HealthRegen.Text = s:FindFirstChild("HealthRegen") and tostring(s.HealthRegen.Value) or "0"
+		statLabels.MaxMana.Text = s:FindFirstChild("MaxMana") and tostring(s.MaxMana.Value) or "0"
+		statLabels.ManaRegen.Text = s:FindFirstChild("ManaRegen") and tostring(s.ManaRegen.Value) or "0"
+		statLabels.Strength.Text = s:FindFirstChild("Strength") and tostring(s.Strength.Value) or "0"
+		statLabels.CritChance.Text = (s:FindFirstChild("CriticalChance") and tostring(s.CriticalChance.Value) or "0") .. "%"
+		statLabels.CritDamage.Text = (s:FindFirstChild("CriticalDamage") and tostring(s.CriticalDamage.Value) or "0") .. "%"
+	end
+end
+
+local midFrame = Instance.new("Frame")
+midFrame.Size = UDim2.new(0.35, 0, 0.75, 0)
+midFrame.Position = UDim2.new(0.28, 0, 0.15, 0)
+midFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+midFrame.BackgroundTransparency = 0.1
+midFrame.Parent = bg
+applyStyle(midFrame)
+
+local vpf = Instance.new("ViewportFrame")
+vpf.Size = UDim2.new(1, 0, 1, 0)
+vpf.BackgroundTransparency = 1
+vpf.Parent = midFrame
+
+local charClone = nil
+local currentRot = 0 
+local vpfCamera = Instance.new("Camera")
+
+local function setupDynamicViewport()
+	vpf:ClearAllChildren()
+	local char = player.Character or player.CharacterAdded:Wait()
+	char.Archivable = true
+	local worldModel = Instance.new("WorldModel")
+	worldModel.Parent = vpf
+
+	charClone = char:Clone()
+
+	local idleAnimId = "rbxassetid://507766388" 
+	if char:FindFirstChild("Humanoid") and char.Humanoid.RigType == Enum.HumanoidRigType.R6 then
+		idleAnimId = "rbxassetid://180435571" 
+	end
+
+	local animateScript = char:FindFirstChild("Animate")
+	if animateScript and animateScript:FindFirstChild("idle") then
+		local animObj = animateScript.idle:FindFirstChildOfClass("Animation")
+		if animObj then idleAnimId = animObj.AnimationId end
+	end
+
+	for _, v in pairs(charClone:GetDescendants()) do
+		if v:IsA("Script") or v:IsA("LocalScript") then v:Destroy() end
+	end
+
+	charClone.Parent = worldModel
+	charClone:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(currentRot), 0))
+
+	local humanoid = charClone:FindFirstChild("Humanoid")
+	if humanoid then
+		local animator = humanoid:FindFirstChild("Animator") or Instance.new("Animator", humanoid)
+		local animation = Instance.new("Animation")
+		animation.AnimationId = idleAnimId
+		local track = animator:LoadAnimation(animation)
+		track.Looped = true
+		track:Play()
+	end
+
+	local charCFrame, charSize = charClone:GetBoundingBox()
+	local targetPos = charCFrame.Position
+	vpfCamera.FieldOfView = 22 
+
+	local distance = (charSize.Y / 2) / math.tan(math.rad(vpfCamera.FieldOfView / 2))
+	vpfCamera.CFrame = CFrame.lookAt(targetPos + Vector3.new(0, 0, -distance * 1.1), targetPos)
+
+	vpf.CurrentCamera = vpfCamera
+	vpfCamera.Parent = vpf
+end
+
+local equipContainer = Instance.new("Frame")
+equipContainer.Size = UDim2.new(0.12, 0, 0.75, 0)
+equipContainer.Position = UDim2.new(0.65, 0, 0.15, 0)
+equipContainer.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+equipContainer.BackgroundTransparency = 0.1
+equipContainer.Parent = bg
+applyStyle(equipContainer)
+
+local equipTitle = Instance.new("TextLabel")
+equipTitle.Size = UDim2.new(1, 0, 0, 45)
+equipTitle.BackgroundTransparency = 1
+equipTitle.Text = "GEAR"
+equipTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+equipTitle.Font = Enum.Font.GothamBold
+equipTitle.TextSize = 16
+equipTitle.Parent = equipContainer
+
+local eqLayout = Instance.new("UIListLayout")
+eqLayout.Padding = UDim.new(0, 15)
+eqLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+eqLayout.SortOrder = Enum.SortOrder.LayoutOrder
+eqLayout.Parent = equipContainer
+
+local eqSpacer = Instance.new("Frame", equipContainer) eqSpacer.Size = UDim2.new(1,0,0,30) eqSpacer.BackgroundTransparency = 1 eqSpacer.LayoutOrder = 0
+
+local equipSlots = {} 
+local function createEquipSlot(name, order)
+	local s = Instance.new("TextButton")
+	s.Name = name .. "Slot" 
+	s.Size = UDim2.new(0, 75, 0, 75) 
+	s.BackgroundColor3 = Color3.fromRGB(22, 25, 32)
+	s.Text = ""
+	s.AutoButtonColor = false
+	s.LayoutOrder = order
+	applyStyle(s)
+
+	local txt = Instance.new("TextLabel", s)
+	txt.Size = UDim2.new(1, 0, 1, 0)
+	txt.BackgroundTransparency = 1
+	txt.Text = name
+	txt.TextColor3 = Color3.fromRGB(110, 115, 130)
+	txt.Font = Enum.Font.GothamMedium
+	txt.TextSize = 10
+	txt.TextWrapped = true
+	txt.Parent = s
+
+	local icon = Instance.new("ImageLabel", s)
+	icon.Size = UDim2.new(0.8, 0, 0.8, 0)
+	icon.Position = UDim2.new(0.1, 0, 0.1, 0)
+	icon.BackgroundTransparency = 1
+	icon.Image = ""
+
+	s.Parent = equipContainer
+	equipSlots[name] = {Btn = s, Txt = txt, Icon = icon}
+end
+
+createEquipSlot("Weapon", 1)
+createEquipSlot("Armor", 2)
+createEquipSlot("Accessory", 3)
+
+local invFrame = Instance.new("Frame")
+invFrame.Size = UDim2.new(0.18, 0, 0.75, 0)
+invFrame.Position = UDim2.new(0.79, 0, 0.15, 0)
+invFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+invFrame.BackgroundTransparency = 0.1
+invFrame.Parent = bg
+applyStyle(invFrame)
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -10, 1, -20)
+scroll.Position = UDim2.new(0, 5, 0, 10)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 4
+scroll.ScrollBarImageColor3 = Color3.fromRGB(60, 65, 80)
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.Parent = invFrame
+
+local invPadding = Instance.new("UIPadding", scroll)
+invPadding.PaddingTop = UDim.new(0, 15)
+
+local grid = Instance.new("UIGridLayout")
+grid.CellSize = UDim2.new(0, 62, 0, 62)
+grid.CellPadding = UDim2.new(0, 10, 0, 10)
+grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+grid.SortOrder = Enum.SortOrder.LayoutOrder
+grid.Parent = scroll
+
+
+-- ==========================================
+-- 2. RYCHL� INVENT�� (HUD - I)
+-- ==========================================
+local quickInvGui = Instance.new("ScreenGui")
+quickInvGui.Name = "QuickInventoryGui"
+quickInvGui.ResetOnSpawn = false
+quickInvGui.DisplayOrder = 90
+quickInvGui.Parent = pGui
+
+-- Hlavn� kontejner invent��e
+local quickInvFrame = Instance.new("Frame")
+quickInvFrame.Size = UDim2.new(0, 320, 0, 480) -- V�t�� a prostorn�j��
+quickInvFrame.Position = UDim2.new(1, -20, 1, -20)
+quickInvFrame.AnchorPoint = Vector2.new(1, 1)
+quickInvFrame.BackgroundColor3 = Color3.fromRGB(20, 23, 29)
+quickInvFrame.BackgroundTransparency = 0.05
+quickInvFrame.Visible = false
+quickInvFrame.Parent = quickInvGui
+applyStyle(quickInvFrame)
+
+-- Hlavi�ka, za kterou se to d� tahat
+local qTopBar = Instance.new("Frame")
+qTopBar.Size = UDim2.new(1, 0, 0, 45)
+qTopBar.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+qTopBar.BorderSizePixel = 0
+qTopBar.Parent = quickInvFrame
+Instance.new("UICorner", qTopBar).CornerRadius = UDim.new(0, 8)
+
+-- Tento r�me�ek zarovn� spodek hlavi�ky, aby nem�la dole zakulacen� rohy a spojila se se zbytkem
+local qTopBarFix = Instance.new("Frame")
+qTopBarFix.Size = UDim2.new(1, 0, 0, 10)
+qTopBarFix.Position = UDim2.new(0, 0, 1, -10)
+qTopBarFix.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+qTopBarFix.BorderSizePixel = 0
+qTopBarFix.Parent = qTopBar
+
+local qTopBarLine = Instance.new("Frame")
+qTopBarLine.Size = UDim2.new(1, 0, 0, 1)
+qTopBarLine.Position = UDim2.new(0, 0, 1, 0)
+qTopBarLine.BackgroundColor3 = Color3.fromRGB(50, 55, 70)
+qTopBarLine.BorderSizePixel = 0
+qTopBarLine.Parent = qTopBar
+
+local quickInvTitle = Instance.new("TextLabel")
+quickInvTitle.Size = UDim2.new(1, 0, 1, 0)
+quickInvTitle.BackgroundTransparency = 1
+quickInvTitle.Text = "INVENTORY"
+quickInvTitle.TextColor3 = Color3.fromRGB(220, 225, 240)
+quickInvTitle.Font = Enum.Font.GothamBold
+quickInvTitle.TextSize = 16
+quickInvTitle.Parent = qTopBar
+
+local qScroll = Instance.new("ScrollingFrame")
+qScroll.Size = UDim2.new(1, -10, 1, -55)
+qScroll.Position = UDim2.new(0, 5, 0, 50)
+qScroll.BackgroundTransparency = 1
+qScroll.BorderSizePixel = 0
+qScroll.ScrollBarThickness = 4
+qScroll.ScrollBarImageColor3 = Color3.fromRGB(60, 65, 80)
+qScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+qScroll.Parent = quickInvFrame
+
+local qGrid = Instance.new("UIGridLayout")
+qGrid.CellSize = UDim2.new(0, 65, 0, 65) -- V�t�� ikony
+qGrid.CellPadding = UDim2.new(0, 8, 0, 8)
+qGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+qGrid.SortOrder = Enum.SortOrder.LayoutOrder
+qGrid.Parent = qScroll
+
+local qPadding = Instance.new("UIPadding", qScroll)
+qPadding.PaddingTop = UDim.new(0, 5)
+
+
+-- ==========================================
+-- DRAG LOGIKA PRO RYCHL� INVENT�� (P�esouv�n� okna)
+-- ==========================================
+local draggingQInv = false
+local qInvDragStart = nil
+local qInvStartPos = nil
+
+qTopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingQInv = true
+		qInvDragStart = input.Position
+		qInvStartPos = quickInvFrame.Position
+	end
+end)
+
+
+-- ==========================================
+-- 3. GLOB�LN� KONTEXTOV� MENU (PRAV� TLA��TKO)
+-- ==========================================
+local ctxGui = Instance.new("ScreenGui")
+ctxGui.Name = "ContextMenuGui"
+ctxGui.DisplayOrder = 200
+ctxGui.Parent = pGui
+
+local ctxBlocker = Instance.new("TextButton")
+ctxBlocker.Size = UDim2.new(1, 0, 1, 0)
+ctxBlocker.BackgroundTransparency = 1
+ctxBlocker.Text = ""
+ctxBlocker.ZIndex = 50
+ctxBlocker.Visible = false
+ctxBlocker.Parent = ctxGui
+
+local ctxMenu = Instance.new("Frame")
+ctxMenu.Size = UDim2.new(0, 120, 0, 80)
+ctxMenu.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
+ctxMenu.ZIndex = 51
+ctxMenu.Visible = false
+ctxMenu.Parent = ctxGui
+applyStyle(ctxMenu)
+
+local ctxLayout = Instance.new("UIListLayout")
+ctxLayout.Parent = ctxMenu
+
+local function createCtxBtn(text)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 0.5, 0)
+	btn.BackgroundTransparency = 1
+	btn.Text = text
+	btn.TextColor3 = Color3.fromRGB(200, 205, 220)
+	btn.Font = Enum.Font.GothamMedium
+	btn.TextSize = 14
+	btn.ZIndex = 52
+	btn.Parent = ctxMenu
+
+	btn.MouseEnter:Connect(function() btn.TextColor3 = Color3.fromRGB(255, 255, 255) end)
+	btn.MouseLeave:Connect(function() btn.TextColor3 = Color3.fromRGB(200, 205, 220) end)
+	return btn
+end
+
+local btnEquip = createCtxBtn("Equip")
+local btnDrop = createCtxBtn("Drop")
+
+local activeCtxItem = nil
+
+local function closeCtxMenu()
+	ctxMenu.Visible = false
+	ctxBlocker.Visible = false
+	activeCtxItem = nil
+end
+
+ctxBlocker.MouseButton1Click:Connect(closeCtxMenu)
+ctxBlocker.MouseButton2Click:Connect(closeCtxMenu)
+
+
+-- ==========================================
+-- 4. LOGIKA DROP A OBNOVA UI
+-- ==========================================
+local function dropItem(item)
+	if item and item:IsA("Tool") then
+		item.Parent = workspace
+		local handle = item:FindFirstChild("Handle")
+		if handle and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			handle.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.new(0, 2, -6)
+			local connection
+			connection = handle.Touched:Connect(function(hit)
+				local hitChar = hit.Parent
+				local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
+				if hitPlayer then
+					item.Parent = hitPlayer:FindFirstChild("Backpack")
+					if connection then connection:Disconnect() end
+				end
+			end)
+
+			handle.CanTouch = false
+			task.delay(1.5, function()
+				if handle then handle.CanTouch = true end
+			end)
+		end
+	end
+end
+
+local RefreshInventoryUI 
+local RefreshQuickInventoryUI
+local draggingItemObj = nil
+local dragGhost = nil
+local draggingFromEquip = false
+local draggingRot = false
+local lastXRot = 0
+
+local function triggerUIRefresh()
+	if menuGui.Enabled then
+		RefreshInventoryUI()
+		setupDynamicViewport()
+	end
+	if quickInvFrame.Visible then
+		RefreshQuickInventoryUI()
+	end
+end
+
+RefreshInventoryUI = function()
+	for _, child in pairs(scroll:GetChildren()) do
+		if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
+	end
+
+	local char = player.Character
+	local backpack = player:FindFirstChild("Backpack")
+	local equippedTool = char and char:FindFirstChildOfClass("Tool")
+
+	if equippedTool then
+		equipSlots["Weapon"].Txt.Text = "" 
+		equipSlots["Weapon"].Icon.Image = equippedTool.TextureId 
+	else
+		equipSlots["Weapon"].Txt.Text = "Weapon"
+		equipSlots["Weapon"].Icon.Image = ""
+	end
+
+	local slotCount = 0
+	if backpack then
+		for _, item in pairs(backpack:GetChildren()) do
+			if item:IsA("Tool") then
+				slotCount = slotCount + 1
+				local btn = Instance.new("TextButton")
+				btn.Size = UDim2.new(0, 62, 0, 62)
+				btn.BackgroundColor3 = Color3.fromRGB(35, 40, 50)
+				btn.Text = "" 
+				btn.LayoutOrder = 1 
+				applyStyle(btn)
+
+				local itemIcon = Instance.new("ImageLabel", btn)
+				itemIcon.Size = UDim2.new(0.8, 0, 0.8, 0)
+				itemIcon.Position = UDim2.new(0.1, 0, 0.1, 0)
+				itemIcon.BackgroundTransparency = 1
+				itemIcon.Image = item.TextureId
+				btn.Parent = scroll
+
+				btn.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						if dragGhost then dragGhost:Destroy() end 
+						draggingItemObj = item
+						draggingFromEquip = false
+						dragGhost = Instance.new("ImageLabel")
+						dragGhost.Size = UDim2.new(0, 60, 0, 60)
+						dragGhost.Image = item.TextureId
+						dragGhost.BackgroundTransparency = 1
+						dragGhost.ZIndex = 100
+						dragGhost.Parent = menuGui
+						local mouseLoc = UserInputService:GetMouseLocation()
+						dragGhost.Position = UDim2.new(0, mouseLoc.X - 30, 0, mouseLoc.Y - 30)
+						closeCtxMenu()
+					elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+						activeCtxItem = item
+						btnEquip.Text = "Equip"
+						local mouseLoc = UserInputService:GetMouseLocation()
+						ctxMenu.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y - 36)
+						ctxBlocker.Visible = true
+						ctxMenu.Visible = true
+					end
+				end)
+			end
+		end
+	end
+
+	for i = slotCount + 1, 35 do
+		local s = Instance.new("Frame")
+		s.BackgroundColor3 = Color3.fromRGB(22, 25, 32)
+		s.LayoutOrder = 10 
+		applyStyle(s)
+		s.Parent = scroll
+	end
+end
+
+RefreshQuickInventoryUI = function()
+	for _, child in pairs(qScroll:GetChildren()) do
+		if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
+	end
+
+	local char = player.Character
+	local backpack = player:FindFirstChild("Backpack")
+	local slotCount = 0
+
+	if char then
+		for _, item in pairs(char:GetChildren()) do
+			if item:IsA("Tool") then
+				slotCount = slotCount + 1
+				local btn = Instance.new("TextButton")
+				btn.Size = UDim2.new(0, 65, 0, 65)
+				btn.BackgroundColor3 = Color3.fromRGB(45, 50, 60) 
+				btn.Text = "" 
+				btn.LayoutOrder = 1 
+				applyStyle(btn)
+
+				local itemIcon = Instance.new("ImageLabel", btn)
+				itemIcon.Size = UDim2.new(0.8, 0, 0.8, 0)
+				itemIcon.Position = UDim2.new(0.1, 0, 0.1, 0)
+				itemIcon.BackgroundTransparency = 1
+				itemIcon.Image = item.TextureId
+
+				local eLbl = Instance.new("TextLabel", btn)
+				eLbl.Size = UDim2.new(0, 18, 0, 18)
+				eLbl.Position = UDim2.new(0, 4, 0, 4)
+				eLbl.BackgroundColor3 = Color3.fromRGB(220, 160, 40) 
+				eLbl.Text = "E"
+				eLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+				eLbl.Font = Enum.Font.GothamBold
+				eLbl.TextSize = 11
+				Instance.new("UICorner", eLbl).CornerRadius = UDim.new(0, 4)
+
+				btn.Parent = qScroll
+
+				btn.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton2 then
+						activeCtxItem = item
+						btnEquip.Text = "Unequip"
+						local mouseLoc = UserInputService:GetMouseLocation()
+						ctxMenu.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y - 36)
+						ctxBlocker.Visible = true
+						ctxMenu.Visible = true
+					end
+				end)
+			end
+		end
+	end
+
+	if backpack then
+		for _, item in pairs(backpack:GetChildren()) do
+			if item:IsA("Tool") then
+				slotCount = slotCount + 1
+				local btn = Instance.new("TextButton")
+				btn.Size = UDim2.new(0, 65, 0, 65)
+				btn.BackgroundColor3 = Color3.fromRGB(35, 40, 50)
+				btn.Text = "" 
+				btn.LayoutOrder = 2 
+				applyStyle(btn)
+
+				local itemIcon = Instance.new("ImageLabel", btn)
+				itemIcon.Size = UDim2.new(0.8, 0, 0.8, 0)
+				itemIcon.Position = UDim2.new(0.1, 0, 0.1, 0)
+				itemIcon.BackgroundTransparency = 1
+				itemIcon.Image = item.TextureId
+				btn.Parent = qScroll
+
+				btn.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton2 then
+						activeCtxItem = item
+						btnEquip.Text = "Equip"
+						local mouseLoc = UserInputService:GetMouseLocation()
+						ctxMenu.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y - 36)
+						ctxBlocker.Visible = true
+						ctxMenu.Visible = true
+					end
+				end)
+			end
+		end
+	end
+
+	-- P�id�me pr�zdn� sloty pro vypln�n� (zv�t�eno na 28 slot� d�ky v�t��mu oknu)
+	for i = slotCount + 1, 28 do
+		local s = Instance.new("Frame")
+		s.BackgroundColor3 = Color3.fromRGB(22, 25, 32)
+		s.LayoutOrder = 10 
+		applyStyle(s)
+		s.Parent = qScroll
+	end
+end
+
+-- ==========================================
+-- 5. AKCE PRO KONTEXTOV� MENU
+-- ==========================================
+btnEquip.MouseButton1Click:Connect(function()
+	local char = player.Character
+	local humanoid = char and char:FindFirstChild("Humanoid")
+	if activeCtxItem and humanoid then
+		if btnEquip.Text == "Equip" then
+			humanoid:EquipTool(activeCtxItem)
+			updateGearEvent:FireServer("Weapon", activeCtxItem.Name)
+		elseif btnEquip.Text == "Unequip" then
+			humanoid:UnequipTools()
+			updateGearEvent:FireServer("Weapon", "")
+		end
+		closeCtxMenu()
+		triggerUIRefresh()
+	end
+end)
+
+btnDrop.MouseButton1Click:Connect(function()
+	if activeCtxItem then
+		local char = player.Character
+		local humanoid = char and char:FindFirstChild("Humanoid")
+		if humanoid and activeCtxItem.Parent == char then
+			humanoid:UnequipTools()
+			updateGearEvent:FireServer("Weapon", "") 
+		end
+		dropItem(activeCtxItem)
+		closeCtxMenu()
+		triggerUIRefresh()
+	end
+end)
+
+-- ==========================================
+-- 6. HL�DA� GLOB�LN�CH INPUT� (Drag item�, rotace okna a posun UI)
+-- ==========================================
+local function releaseDrag(mx, my)
+	if not dragGhost then return end
+
+	local wSlot = equipSlots["Weapon"].Btn
+	local wPos = wSlot.AbsolutePosition
+	local wSize = wSlot.AbsoluteSize
+
+	local droppedOnWeapon = (mx >= wPos.X and mx <= wPos.X + wSize.X and my >= wPos.Y and my <= wPos.Y + wSize.Y)
+	local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
+
+	local stateChanged = false
+
+	if draggingFromEquip then
+		if not droppedOnWeapon and humanoid then
+			humanoid:UnequipTools()
+			updateGearEvent:FireServer("Weapon", "") 
+			stateChanged = true
+		end
+	else
+		if droppedOnWeapon and humanoid and draggingItemObj then
+			humanoid:EquipTool(draggingItemObj)
+			updateGearEvent:FireServer("Weapon", draggingItemObj.Name) 
+			stateChanged = true
+		end
+	end
+
+	dragGhost:Destroy()
+	dragGhost = nil
+	draggingItemObj = nil
+	draggingFromEquip = false
+
+	if stateChanged then triggerUIRefresh() end
+end
+
+midFrame.InputBegan:Connect(function(i) 
+	if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingRot = true lastXRot = i.Position.X closeCtxMenu() end 
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	-- P�esun itemu ve velk�m menu
+	if dragGhost and (input.UserInputType == Enum.UserInputType.MouseMovement) then
+		local mouseLoc = UserInputService:GetMouseLocation()
+		dragGhost.Position = UDim2.new(0, mouseLoc.X - 30, 0, mouseLoc.Y - 30)
+	end
+
+	-- Rotace postavy
+	if draggingRot and input.UserInputType == Enum.UserInputType.MouseMovement and charClone then
+		currentRot = currentRot + (input.Position.X - lastXRot)
+		charClone:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(currentRot), 0))
+		lastXRot = input.Position.X
+	end
+
+	-- P�esun rychl�ho invent��e po obrazovce
+	if draggingQInv and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - qInvDragStart
+		quickInvFrame.Position = UDim2.new(
+			qInvStartPos.X.Scale, qInvStartPos.X.Offset + delta.X,
+			qInvStartPos.Y.Scale, qInvStartPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingRot = false
+		draggingQInv = false -- Zastav� p�esouv�n� invent��e
+
+		if dragGhost then
+			local mouseLoc = UserInputService:GetMouseLocation()
+			releaseDrag(mouseLoc.X, mouseLoc.Y - 36)
+		end
+	end
+end)
+
+equipSlots["Weapon"].Btn.InputBegan:Connect(function(input)
+	local char = player.Character
+	local equippedTool = char and char:FindFirstChildOfClass("Tool")
+
+	if equippedTool then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if dragGhost then dragGhost:Destroy() end
+			draggingItemObj = equippedTool
+			draggingFromEquip = true
+			dragGhost = Instance.new("ImageLabel")
+			dragGhost.Size = UDim2.new(0, 60, 0, 60)
+			dragGhost.Image = equippedTool.TextureId
+			dragGhost.BackgroundTransparency = 1
+			dragGhost.ZIndex = 100
+			dragGhost.Parent = menuGui
+			local mouseLoc = UserInputService:GetMouseLocation()
+			dragGhost.Position = UDim2.new(0, mouseLoc.X - 30, 0, mouseLoc.Y - 30)
+			closeCtxMenu()
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+			activeCtxItem = equippedTool
+			btnEquip.Text = "Unequip"
+			local mouseLoc = UserInputService:GetMouseLocation()
+			ctxMenu.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y - 36)
+			ctxBlocker.Visible = true
+			ctxMenu.Visible = true
+		end
+	end
+end)
+
+-- ==========================================
+-- 7. OVL�D�N� KL�VESAMI A BLOKOV�N� KAMERY
+-- ==========================================
+local function toggleMainMenu()
+	menuGui.Enabled = not menuGui.Enabled
+
+	-- HL�DA�: P menu okam�it� nahl�s� sv�j nov� stav hr��i
+	game.Players.LocalPlayer:SetAttribute("PMenuOpen", menuGui.Enabled)
+
+	local controls = PlayerModule:GetControls()
+	local mainCam = workspace.CurrentCamera
+	closeCtxMenu()
+
+	if menuGui.Enabled then
+		blur.Size = 20
+		controls:Disable()
+		mainCam.CameraType = Enum.CameraType.Scriptable 
+		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false) end)
+		for _, g in pairs(pGui:GetChildren()) do 
+			if g:IsA("ScreenGui") and g ~= menuGui and g ~= ctxGui then 
+				if g.Enabled then g:SetAttribute("WasEnabled", true) g.Enabled = false end
+			end 
+		end
+		task.wait(0.05)
+		triggerUIRefresh()
+		updateStats()
+	else
+		blur.Size = 0
+		controls:Enable()
+		mainCam.CameraType = Enum.CameraType.Custom 
+		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true) end)
+		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end) 
+		for _, g in pairs(pGui:GetChildren()) do 
+			if g:IsA("ScreenGui") and g:GetAttribute("WasEnabled") then 
+				g.Enabled = true g:SetAttribute("WasEnabled", nil)
+			end 
+		end
+	end
+end
+
+local function toggleQuickInv()
+	if not menuGui.Enabled then
+		quickInvFrame.Visible = not quickInvFrame.Visible
+		closeCtxMenu()
+		if quickInvFrame.Visible then
+			RefreshQuickInventoryUI()
+		end
+	end
+end
+
+local function handleMenuInputs(actionName, inputState, inputObject)
+	if inputState == Enum.UserInputState.Begin then
+		if actionName == "ToggleMainMenu" then
+			-- OCHRANN� BLBOST: Pokud se sna�� zapnout P menu, ale K menu je otev�en�...
+			if not menuGui.Enabled and game.Players.LocalPlayer:GetAttribute("KMenuOpen") then
+				-- Skript propust� sign�l (Pass). D�ky tomu si K menu v�imne, �e jsi zm��kl P, 
+				-- a samo se zav�e. Ty pak jen zm��kne� P znovu a v klidu se otev�e.
+				return Enum.ContextActionResult.Pass
+			end
+
+			toggleMainMenu()
+		elseif actionName == "ToggleQuickInv" then
+			toggleQuickInv()
+		end
+	end
+	return Enum.ContextActionResult.Sink
+end
+
+ContextActionService:BindActionAtPriority(
+	"ToggleMainMenu", handleMenuInputs, false, 
+	Enum.ContextActionPriority.High.Value + 100, Enum.KeyCode.P
+)
+
+ContextActionService:BindActionAtPriority(
+	"ToggleQuickInv", handleMenuInputs, false, 
+	Enum.ContextActionPriority.High.Value + 100, Enum.KeyCode.I
+)
+
+close.MouseButton1Click:Connect(toggleMainMenu)
+RunService.RenderStepped:Connect(function() if menuGui.Enabled then updateStats() end end)
+
+-- ==========================================
+-- 8. AUTO-REFRESH A NA�TEN� GEARU ZE SERVERU
+-- ==========================================
+local function setupAutoRefresh()
+	local char = player.Character or player.CharacterAdded:Wait()
+	char.ChildAdded:Connect(function(child)
+		if child:IsA("Tool") then triggerUIRefresh() end
+	end)
+	char.ChildRemoved:Connect(function(child)
+		if child:IsA("Tool") then triggerUIRefresh() end
+	end)
+
+	local backpack = player:WaitForChild("Backpack")
+	backpack.ChildAdded:Connect(function(child)
+		if child:IsA("Tool") then triggerUIRefresh() end
+	end)
+	backpack.ChildRemoved:Connect(function(child)
+		if child:IsA("Tool") then triggerUIRefresh() end
+	end)
+end
+
+local function autoEquipSavedGear()
+	local gearFolder = player:WaitForChild("EquippedGear", 10)
+	if not gearFolder then return end
+
+	local savedWeapon = gearFolder:WaitForChild("Weapon").Value
+	if savedWeapon ~= "" then
+		task.spawn(function()
+			local backpack = player:WaitForChild("Backpack")
+			local tool = backpack:FindFirstChild(savedWeapon)
+			local attempts = 0
+
+			while not tool and attempts < 10 do
+				task.wait(0.5)
+				tool = backpack:FindFirstChild(savedWeapon)
+				attempts = attempts + 1
+			end
+
+			local char = player.Character or player.CharacterAdded:Wait()
+			local humanoid = char:WaitForChild("Humanoid")
+			local currentlyEquipped = char:FindFirstChildOfClass("Tool")
+
+			if tool and humanoid and not currentlyEquipped then
+				humanoid:EquipTool(tool)
+				triggerUIRefresh()
+			end
+		end)
+	end
+end
+
+local function onCharacterSpawned()
+	setupAutoRefresh()
+	autoEquipSavedGear()
+end
+
+player.CharacterAdded:Connect(onCharacterSpawned)
+if player.Character then onCharacterSpawned() end
