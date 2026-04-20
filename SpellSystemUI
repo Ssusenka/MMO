@@ -1,19 +1,79 @@
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
-local pGui = player:WaitForChild("PlayerGui")
+local spellGui = script.Parent
 
--- BEZPEČNÉ NAČÍTÁNÍ DAT
-local spellBook = player:WaitForChild("SpellBook", 10)
-if not spellBook then return end
-local selectedClassObj = spellBook:WaitForChild("SelectedClass", 5)
-local loadoutsFolder = spellBook:WaitForChild("Loadouts", 5)
-local remote = ReplicatedStorage:WaitForChild("SpellBookRemote", 5)
+-- 1. NAČTENÍ SLOŽKY (Čeká do nekonečna, dokud se nenačte)
+local SpellModules = ReplicatedStorage:WaitForChild("SpellModules")
 
--- BEZPEČNÉ NAČTENÍ POHYBU
+-- 2. NAČTENÍ DAT Z MODULŮ
+local classData = {
+	["Magic"] = {
+		Spells = require(SpellModules:WaitForChild("MagicData")),
+		Passives = require(SpellModules:WaitForChild("MagicPassives"))
+	},
+	["Range"] = {
+		Spells = require(SpellModules:WaitForChild("RangeData")),
+		Passives = require(SpellModules:WaitForChild("RangePassives"))
+	},
+	["Melee"] = {
+		Spells = require(SpellModules:WaitForChild("MeleeData")),
+		Passives = require(SpellModules:WaitForChild("MeleePassives"))
+	}
+}
+
+-- 3. REFERENCE NA SPELLBOOK (Opět čeká bez limitu)
+local spellBook = player:WaitForChild("SpellBook")
+local selectedClassObj = spellBook:WaitForChild("SelectedClass")
+local remote = ReplicatedStorage:WaitForChild("SpellBookRemote")
+local CLASSES = {"Magic", "Range", "Melee"}
+
+-- 4. VYTVOŘENÍ TOOLTIPU (Přímo v kódu, aby byl hned k dispozici)
+local tooltip = Instance.new("Frame")
+tooltip.Name = "SpellTooltip"
+tooltip.Size = UDim2.new(0, 220, 0, 90)
+tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+tooltip.BorderSizePixel = 2
+tooltip.BorderColor3 = Color3.fromRGB(255, 200, 0)
+tooltip.Visible = false
+tooltip.ZIndex = 1000
+tooltip.Parent = spellGui
+
+local tooltipTitle = Instance.new("TextLabel", tooltip)
+tooltipTitle.Name = "Title"; tooltipTitle.Size = UDim2.new(1, -10, 0, 25); tooltipTitle.Position = UDim2.new(0, 5, 0, 5)
+tooltipTitle.BackgroundTransparency = 1; tooltipTitle.TextColor3 = Color3.new(1, 1, 1)
+tooltipTitle.Font = Enum.Font.GothamBold; tooltipTitle.TextSize = 16; tooltipTitle.TextXAlignment = "Left"
+
+local tooltipDesc = Instance.new("TextLabel", tooltip)
+tooltipDesc.Name = "Description"; tooltipDesc.Size = UDim2.new(1, -10, 1, -40); tooltipDesc.Position = UDim2.new(0, 5, 0, 30)
+tooltipDesc.BackgroundTransparency = 1; tooltipDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
+tooltipDesc.Font = Enum.Font.Gotham; tooltipDesc.TextSize = 13; tooltipDesc.TextWrapped = true
+tooltipDesc.TextYAlignment = "Top"; tooltipDesc.TextXAlignment = "Left"
+
+-- 5. FUNKCE PRO TOOLTIP (Musí být nad makeDraggable, aby ji viděl)
+local function updateTooltip(name, description)
+	if name and description then
+		tooltipTitle.Text = name
+		tooltipDesc.Text = description
+		tooltip.Visible = true
+		local mouseLoc = UIS:GetMouseLocation()
+		tooltip.Position = UDim2.new(0, mouseLoc.X + 15, 0, mouseLoc.Y - 35)
+	else
+		tooltip.Visible = false
+	end
+end
+
+-- Sledování pohybu myši pro tooltip
+UIS.InputChanged:Connect(function(input)
+	if tooltip.Visible and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local mouseLoc = UIS:GetMouseLocation()
+		tooltip.Position = UDim2.new(0, mouseLoc.X + 15, 0, mouseLoc.Y - 35)
+	end
+end)
+
+-- 5. POMOCNÁ FUNKCE PRO POHYB
 local Controls = nil
 local function getControls()
 	if not Controls then
@@ -29,53 +89,6 @@ local function getControls()
 	end
 	return Controls
 end
-
--- ==========================================
--- DATA A STYLY
--- ==========================================
-local CLASSES = {"Magic", "Range", "Melee"}
-local SPELLS = {
-	["Magic"] = {"Fireball", "FrostNova", "Shield", "Blink", "Beam", "Heal", "Meteor"},
-	["Range"] = {"Arrow", "Poison", "Dash", "Trap", "Piercing", "Volley", "Sniper"},
-	["Melee"] = {"Slash", "Whirl", "Block", "Bash", "Charge", "Lifesteal", "Execute"}
-}
-local PASSIVES = {
-	["Magic"] = {"ManaFlow", "Focus", "ArcaneInt", "Wisdom", "Illusion", "Meditation"},
-	["Range"] = {"Agility", "EagleEye", "Swiftness", "Stealth", "Precision", "Acrobatics"},
-	["Melee"] = {"Vitality", "Strength", "Guardian", "HardSkin", "WarriorWill", "IronClad"}
-}
-
-local COLORS = {
-	HeaderBg = Color3.fromRGB(15, 15, 18),
-	PanelBg = Color3.fromRGB(22, 23, 27),
-	PanelTrans = 0.15,
-	SlotBg = Color3.fromRGB(25, 26, 32),
-	Stroke = Color3.fromRGB(45, 48, 55),
-	Text = Color3.fromRGB(240, 240, 240),
-	Highlight = Color3.fromRGB(75, 135, 220)
-}
-
-local function createCorner(parent, radius)
-	local c = Instance.new("UICorner", parent)
-	c.CornerRadius = UDim.new(0, radius or 6)
-	return c
-end
-
-local function applyStroke(obj)
-	local stroke = Instance.new("UIStroke", obj)
-	stroke.Color = COLORS.Stroke; stroke.Thickness = 1; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	return stroke
-end
-
-local function createText(parent, text, size, pos, align, fontSize, isTitle)
-	local txt = Instance.new("TextLabel", parent)
-	txt.Size = size; txt.Position = pos; txt.Text = text
-	txt.TextColor3 = COLORS.Text; txt.BackgroundTransparency = 1
-	txt.Font = isTitle and Enum.Font.GothamBlack or Enum.Font.GothamBold
-	txt.TextSize = fontSize or 14; txt.TextXAlignment = align or Enum.TextXAlignment.Center
-	return txt
-end
-
 -- ==========================================
 -- 1. HERNÍ HUD SPELL BAR
 -- ==========================================
@@ -199,27 +212,46 @@ end
 local dragScreen = Instance.new("ScreenGui", pGui); dragScreen.Name = "DragGhostGui"; dragScreen.DisplayOrder = 100; dragScreen.IgnoreGuiInset = true
 local ghostIcon = Instance.new("TextLabel", dragScreen)
 ghostIcon.Size = UDim2.new(0, 75, 0, 75); ghostIcon.BackgroundColor3 = COLORS.Highlight; ghostIcon.BackgroundTransparency = 0.2; ghostIcon.TextColor3 = COLORS.Text; ghostIcon.Font = Enum.Font.GothamBold; ghostIcon.TextSize = 12; ghostIcon.TextWrapped = true; ghostIcon.Visible = false; createCorner(ghostIcon, 6); applyStroke(ghostIcon)
+ghostIcon.AnchorPoint = Vector2.new(0.5, 0.5)
 
 local draggingItem = nil; local dragType = nil
 
 local function makeDraggable(parent, name, type)
 	local btn = Instance.new("TextButton", parent)
-	btn.BackgroundColor3 = COLORS.SlotBg; btn.BackgroundTransparency = COLORS.PanelTrans
-	createCorner(btn, 6); applyStroke(btn)
-	btn.Text = name; btn.TextColor3 = COLORS.Text; btn.Font = Enum.Font.GothamBold; btn.TextSize = 12; btn.TextWrapped = true
+	-- ... tvoje nastavení btn (barvy, text atd.) ...
+	btn.Text = name
 
+	-- EVENTY PRO TOOLTIP
+	btn.MouseEnter:Connect(function()
+		local curClass = selectedClassObj.Value
+		if curClass == "" then curClass = "Magic" end
+
+		local data = classData[curClass].Spells[name] or classData[curClass].Passives[name]
+		if data then
+			updateTooltip(name, data.Description)
+		end
+	end)
+
+	btn.MouseLeave:Connect(function()
+		updateTooltip(nil)
+	end)
+
+	-- DRAG EVENT
 	btn.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			draggingItem = name; dragType = type
 			ghostIcon.Text = name; ghostIcon.Visible = true
-			ghostIcon.Position = UDim2.new(0, input.Position.X - 37, 0, input.Position.Y - 37)
+			updateTooltip(nil) -- Schováme tooltip při přetahování
+			local mouseLoc = UIS:GetMouseLocation()
+			ghostIcon.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y)
 		end
 	end)
 end
 
 UIS.InputChanged:Connect(function(input)
 	if draggingItem and input.UserInputType == Enum.UserInputType.MouseMovement then
-		ghostIcon.Position = UDim2.new(0, input.Position.X - 37, 0, input.Position.Y - 37)
+		local mouseLoc = UIS:GetMouseLocation()
+		ghostIcon.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y)
 	end
 end)
 
@@ -245,28 +277,97 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 local function refreshMenu()
+	-- 1. Vyčištění starých ikon
 	for _, v in pairs(pClasses:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
 	for _, v in pairs(gridSpells:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
 	for _, v in pairs(gridPassives:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
 
+	-- 2. Vykreslení tlačítek tříd
 	for _, cName in pairs(CLASSES) do
 		local btn = Instance.new("TextButton", pClasses)
-		btn.Size = UDim2.new(0.85, 0, 0, 60); btn.BackgroundColor3 = COLORS.SlotBg; btn.BackgroundTransparency = COLORS.PanelTrans
-		createCorner(btn, 6); applyStroke(btn)
+		btn.Size = UDim2.new(0.85, 0, 0, 60)
+		btn.BackgroundColor3 = COLORS.SlotBg
+		btn.BackgroundTransparency = COLORS.PanelTrans
+		createCorner(btn, 6)
+		applyStroke(btn)
 
-		btn.Text = string.upper(cName); btn.TextColor3 = COLORS.Text; btn.Font = Enum.Font.GothamBlack; btn.TextSize = 18
+		btn.Text = string.upper(cName)
+		btn.TextColor3 = COLORS.Text
+		btn.Font = Enum.Font.GothamBlack
+		btn.TextSize = 18
+
 		if selectedClassObj.Value == cName then 
-			btn.BackgroundColor3 = COLORS.Highlight; btn.BackgroundTransparency = 0.5
+			btn.BackgroundColor3 = COLORS.Highlight
+			btn.BackgroundTransparency = 0.5
 		end
 		btn.MouseButton1Click:Connect(function() remote:FireServer("SelectClass", cName) end)
 	end
 
+	-- 3. BEZPEČNÉ NAČTENÍ DAT (Tady byla ta chyba)
 	local curClass = selectedClassObj.Value
-	if SPELLS[curClass] then for _, sName in pairs(SPELLS[curClass]) do makeDraggable(gridSpells, sName, "Spell") end end
-	if PASSIVES[curClass] then for _, pName in pairs(PASSIVES[curClass]) do makeDraggable(gridPassives, pName, "Passive") end end
+
+	-- Pokud hráč ještě nemá zvolenou classu, zkusíme vzít první dostupnou nebo skončíme
+	if curClass == "" or curClass == nil then 
+		curClass = "Magic" -- Nastavíme Magic jako základní zobrazení
+	end
+
+	local dataForClass = classData[curClass]
+
+	-- Kontrola, jestli data pro tuhle classu vůbec existují v tabulce classData
+	if dataForClass then
+		-- Načtení Spellů
+		if dataForClass.Spells then
+			for sName, sData in pairs(dataForClass.Spells) do
+				makeDraggable(gridSpells, sName, "Spell")
+			end
+		end
+		-- Načtení Passivek
+		if dataForClass.Passives then
+			for pName, pData in pairs(dataForClass.Passives) do
+				makeDraggable(gridPassives, pName, "Passive")
+			end
+		end
+	else
+		warn("Varování: Pro třídu '" .. tostring(curClass) .. "' nebyla nalezena žádná data v ModuleScriptech!")
+	end
 end
 
-selectedClassObj.Changed:Connect(function() if menuGui.Enabled then refreshMenu() end end)
+-- Registrace změny classy
+selectedClassObj.Changed:Connect(function() 
+	if menuGui.Enabled then 
+		refreshMenu() 
+	end 
+end)
+
+local tooltip = Instance.new("Frame")
+tooltip.Name = "SpellTooltip"
+tooltip.Size = UDim2.new(0, 200, 0, 100)
+tooltip.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tooltip.BorderSizePixel = 2
+tooltip.BorderColor3 = Color3.fromRGB(255, 200, 0)
+tooltip.Visible = false
+tooltip.ZIndex = 1000
+tooltip.Parent = spellGui -- nebo tvůj hlavní ScreenGui
+
+local tooltipTitle = Instance.new("TextLabel", tooltip)
+tooltipTitle.Size = UDim2.new(1, -10, 0, 25)
+tooltipTitle.Position = UDim2.new(0, 5, 0, 5)
+tooltipTitle.BackgroundTransparency = 1
+tooltipTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+tooltipTitle.TextSize = 18
+tooltipTitle.Font = Enum.Font.SourceSansBold
+tooltipTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local tooltipDesc = Instance.new("TextLabel", tooltip)
+tooltipDesc.Size = UDim2.new(1, -10, 1, -35)
+tooltipDesc.Position = UDim2.new(0, 5, 0, 30)
+tooltipDesc.BackgroundTransparency = 1
+tooltipDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
+tooltipDesc.TextSize = 14
+tooltipDesc.Font = Enum.Font.SourceSans
+tooltipDesc.TextWrapped = true
+tooltipDesc.TextYAlignment = Enum.TextYAlignment.Top
+tooltipDesc.TextXAlignment = Enum.TextXAlignment.Left
 
 -- ==========================================
 -- ELEGANTNÍ ZAVÍRÁNÍ A UKLÁDÁNÍ UI
