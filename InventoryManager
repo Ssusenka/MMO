@@ -1,0 +1,404 @@
+local InventoryManager = {}
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Funkce, která to celé nastartuje a převezme data z PlayerMenuScriptu
+function InventoryManager.Init(player, pGui, menuGui, scroll, equipSlots, updateGearEvent, setupDynamicViewport)
+
+	-- Stylizační funkce (tu inventář potřebuje na tlačítka)
+	local function applyStyle(ui)
+		Instance.new("UICorner", ui).CornerRadius = UDim.new(0, 8)
+		local s = Instance.new("UIStroke", ui)
+		s.Color = Color3.fromRGB(45, 50, 65)
+		s.Thickness = 1.5
+	end
+
+	-- ==========================================
+	-- 2. RYCHLÝ INVENTÁŘ (HUD - I)
+	-- ==========================================
+	local quickInvGui = Instance.new("ScreenGui")
+	quickInvGui.Name = "QuickInventoryGui"
+	quickInvGui.ResetOnSpawn = false
+	quickInvGui.DisplayOrder = 90
+	quickInvGui.Parent = pGui
+
+	-- Hlavní kontejner inventáře
+	local quickInvFrame = Instance.new("Frame")
+	quickInvFrame.Size = UDim2.new(0, 320, 0, 480) -- Větší a prostornější
+	quickInvFrame.Position = UDim2.new(1, -20, 1, -20)
+	quickInvFrame.AnchorPoint = Vector2.new(1, 1)
+	quickInvFrame.BackgroundColor3 = Color3.fromRGB(20, 23, 29)
+	quickInvFrame.BackgroundTransparency = 0.05
+	quickInvFrame.Visible = false
+	quickInvFrame.Parent = quickInvGui
+	applyStyle(quickInvFrame)
+
+	-- Hlavička, za kterou se to dá tahat
+	local qTopBar = Instance.new("Frame")
+	qTopBar.Size = UDim2.new(1, 0, 0, 45)
+	qTopBar.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+	qTopBar.BorderSizePixel = 0
+	qTopBar.Parent = quickInvFrame
+	Instance.new("UICorner", qTopBar).CornerRadius = UDim.new(0, 8)
+
+	-- Tento rámeček zarovná spodek hlavičky, aby neměla dole zakulacené rohy a spojila se se zbytkem
+	local qTopBarFix = Instance.new("Frame")
+	qTopBarFix.Size = UDim2.new(1, 0, 0, 10)
+	qTopBarFix.Position = UDim2.new(0, 0, 1, -10)
+	qTopBarFix.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
+	qTopBarFix.BorderSizePixel = 0
+	qTopBarFix.Parent = qTopBar
+
+	local qTopBarLine = Instance.new("Frame")
+	qTopBarLine.Size = UDim2.new(1, 0, 0, 1)
+	qTopBarLine.Position = UDim2.new(0, 0, 1, 0)
+	qTopBarLine.BackgroundColor3 = Color3.fromRGB(50, 55, 70)
+	qTopBarLine.BorderSizePixel = 0
+	qTopBarLine.Parent = qTopBar
+
+	local quickInvTitle = Instance.new("TextLabel")
+	quickInvTitle.Size = UDim2.new(1, 0, 1, 0)
+	quickInvTitle.BackgroundTransparency = 1
+	quickInvTitle.Text = "INVENTORY"
+	quickInvTitle.TextColor3 = Color3.fromRGB(220, 225, 240)
+	quickInvTitle.Font = Enum.Font.GothamBold
+	quickInvTitle.TextSize = 16
+	quickInvTitle.Parent = qTopBar
+
+	local qScroll = Instance.new("ScrollingFrame")
+	qScroll.Size = UDim2.new(1, -10, 1, -55)
+	qScroll.Position = UDim2.new(0, 5, 0, 50)
+	qScroll.BackgroundTransparency = 1
+	qScroll.BorderSizePixel = 0
+	qScroll.ScrollBarThickness = 4
+	qScroll.ScrollBarImageColor3 = Color3.fromRGB(60, 65, 80)
+	qScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	qScroll.Parent = quickInvFrame
+
+	local qGrid = Instance.new("UIGridLayout")
+	qGrid.CellSize = UDim2.new(0, 65, 0, 65) -- Větší ikony
+	qGrid.CellPadding = UDim2.new(0, 8, 0, 8)
+	qGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	qGrid.SortOrder = Enum.SortOrder.LayoutOrder
+	qGrid.Parent = qScroll
+
+	local qPadding = Instance.new("UIPadding", qScroll)
+	qPadding.PaddingTop = UDim.new(0, 5)
+
+
+
+	-- ==========================================
+	-- 3. GLOBÁLNÍ KONTEXTOVÉ MENU (PRAVÉ TLAČÍTKO)
+	-- ==========================================
+	local ctxGui = Instance.new("ScreenGui")
+	ctxGui.Name = "ContextMenuGui"
+	ctxGui.DisplayOrder = 200
+	ctxGui.Parent = pGui
+
+	local ctxBlocker = Instance.new("TextButton")
+	ctxBlocker.Size = UDim2.new(1, 0, 1, 0)
+	ctxBlocker.BackgroundTransparency = 1
+	ctxBlocker.Text = ""
+	ctxBlocker.ZIndex = 50
+	ctxBlocker.Visible = false
+	ctxBlocker.Parent = ctxGui
+
+	local ctxMenu = Instance.new("Frame")
+	ctxMenu.Size = UDim2.new(0, 120, 0, 80)
+	ctxMenu.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
+	ctxMenu.ZIndex = 51
+	ctxMenu.Visible = false
+	ctxMenu.Parent = ctxGui
+	applyStyle(ctxMenu)
+
+	local ctxLayout = Instance.new("UIListLayout")
+	ctxLayout.Parent = ctxMenu
+
+	local function createCtxBtn(text)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(1, 0, 0.5, 0)
+		btn.BackgroundTransparency = 1
+		btn.Text = text
+		btn.TextColor3 = Color3.fromRGB(200, 205, 220)
+		btn.Font = Enum.Font.GothamMedium
+		btn.TextSize = 14
+		btn.ZIndex = 52
+		btn.Parent = ctxMenu
+
+		btn.MouseEnter:Connect(function() btn.TextColor3 = Color3.fromRGB(255, 255, 255) end)
+		btn.MouseLeave:Connect(function() btn.TextColor3 = Color3.fromRGB(200, 205, 220) end)
+		return btn
+	end
+
+	local btnEquip = createCtxBtn("Equip")
+	local btnDrop = createCtxBtn("Drop")
+
+	local activeCtxItem = nil
+
+	local function closeCtxMenu()
+		ctxMenu.Visible = false
+		ctxBlocker.Visible = false
+		activeCtxItem = nil
+	end
+
+	ctxBlocker.MouseButton1Click:Connect(closeCtxMenu)
+	ctxBlocker.MouseButton2Click:Connect(closeCtxMenu)
+
+
+
+	-- ==========================================
+	-- 4. LOGIKA DROP A OBNOVA UI
+	-- ==========================================
+	local function dropItem(item)
+		if item and item:IsA("Tool") then
+			item.Parent = workspace
+			local handle = item:FindFirstChild("Handle")
+			if handle and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				handle.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.new(0, 2, -6)
+				local connection
+				connection = handle.Touched:Connect(function(hit)
+					local hitChar = hit.Parent
+					local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
+					if hitPlayer then
+						item.Parent = hitPlayer:FindFirstChild("Backpack")
+						if connection then connection:Disconnect() end
+					end
+				end)
+
+				handle.CanTouch = false
+				task.delay(1.5, function()
+					if handle then handle.CanTouch = true end
+				end)
+			end
+		end
+	end
+
+	local RefreshInventoryUI 
+	local RefreshQuickInventoryUI
+	local draggingItemObj = nil
+	local dragGhost = nil
+	local draggingFromEquip = false
+	local draggingRot = false
+	local lastXRot = 0
+
+	local function triggerUIRefresh()
+		if menuGui.Enabled then
+			RefreshInventoryUI()
+			setupDynamicViewport()
+		end
+		if quickInvFrame.Visible then
+			RefreshQuickInventoryUI()
+		end
+	end
+
+	RefreshInventoryUI = function()
+		for _, child in pairs(scroll:GetChildren()) do
+			if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
+		end
+
+		local char = player.Character
+		local backpack = player:FindFirstChild("Backpack")
+		local equippedTool = char and char:FindFirstChildOfClass("Tool")
+
+		if equippedTool then
+			equipSlots["Weapon"].Txt.Text = "" 
+			equipSlots["Weapon"].Icon.Image = equippedTool.TextureId 
+		else
+			equipSlots["Weapon"].Txt.Text = "Weapon"
+			equipSlots["Weapon"].Icon.Image = ""
+		end
+
+		local slotCount = 0
+		if backpack then
+			for _, item in pairs(backpack:GetChildren()) do
+				if item:IsA("Tool") then
+					slotCount = slotCount + 1
+					local btn = Instance.new("TextButton")
+					btn.Size = UDim2.new(0, 62, 0, 62)
+					btn.BackgroundColor3 = Color3.fromRGB(35, 40, 50)
+					btn.Text = "" 
+					btn.LayoutOrder = 1 
+					applyStyle(btn)
+
+					local itemIcon = Instance.new("ImageLabel", btn)
+					itemIcon.Size = UDim2.new(0.8, 0, 0.8, 0)
+					itemIcon.Position = UDim2.new(0.1, 0, 0.1, 0)
+					itemIcon.BackgroundTransparency = 1
+					itemIcon.Image = item.TextureId
+					btn.Parent = scroll
+
+					btn.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then
+							if dragGhost then dragGhost:Destroy() end 
+							draggingItemObj = item
+							draggingFromEquip = false
+							dragGhost = Instance.new("ImageLabel")
+							dragGhost.Size = UDim2.new(0, 60, 0, 60)
+							dragGhost.Image = item.TextureId
+							dragGhost.BackgroundTransparency = 1
+							dragGhost.ZIndex = 100
+							dragGhost.Parent = menuGui
+							local mouseLoc = UserInputService:GetMouseLocation()
+							dragGhost.Position = UDim2.new(0, mouseLoc.X - 30, 0, mouseLoc.Y - 30)
+							closeCtxMenu()
+						elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+							activeCtxItem = item
+							btnEquip.Text = "Equip"
+							local mouseLoc = UserInputService:GetMouseLocation()
+							ctxMenu.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y - 36)
+							ctxBlocker.Visible = true
+							ctxMenu.Visible = true
+						end
+					end)
+				end
+			end
+		end
+
+		for i = slotCount + 1, 35 do
+			local s = Instance.new("Frame")
+			s.BackgroundColor3 = Color3.fromRGB(22, 25, 32)
+			s.LayoutOrder = 10 
+			applyStyle(s)
+			s.Parent = scroll
+		end
+	end
+
+	RefreshQuickInventoryUI = function()
+		for _, child in pairs(qScroll:GetChildren()) do
+			if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
+		end
+
+		local char = player.Character
+		local backpack = player:FindFirstChild("Backpack")
+		local slotCount = 0
+
+		if char then
+			for _, item in pairs(char:GetChildren()) do
+				if item:IsA("Tool") then
+					slotCount = slotCount + 1
+					local btn = Instance.new("TextButton")
+					btn.Size = UDim2.new(0, 65, 0, 65)
+					btn.BackgroundColor3 = Color3.fromRGB(45, 50, 60) 
+					btn.Text = "" 
+					btn.LayoutOrder = 1 
+					applyStyle(btn)
+
+					local itemIcon = Instance.new("ImageLabel", btn)
+					itemIcon.Size = UDim2.new(0.8, 0, 0.8, 0)
+					itemIcon.Position = UDim2.new(0.1, 0, 0.1, 0)
+					itemIcon.BackgroundTransparency = 1
+					itemIcon.Image = item.TextureId
+
+					local eLbl = Instance.new("TextLabel", btn)
+					eLbl.Size = UDim2.new(0, 18, 0, 18)
+					eLbl.Position = UDim2.new(0, 4, 0, 4)
+					eLbl.BackgroundColor3 = Color3.fromRGB(220, 160, 40) 
+					eLbl.Text = "E"
+					eLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+					eLbl.Font = Enum.Font.GothamBold
+					eLbl.TextSize = 11
+					Instance.new("UICorner", eLbl).CornerRadius = UDim.new(0, 4)
+
+					btn.Parent = qScroll
+
+					btn.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton2 then
+							activeCtxItem = item
+							btnEquip.Text = "Unequip"
+							local mouseLoc = UserInputService:GetMouseLocation()
+							ctxMenu.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y - 36)
+							ctxBlocker.Visible = true
+							ctxMenu.Visible = true
+						end
+					end)
+				end
+			end
+		end
+
+		if backpack then
+			for _, item in pairs(backpack:GetChildren()) do
+				if item:IsA("Tool") then
+					slotCount = slotCount + 1
+					local btn = Instance.new("TextButton")
+					btn.Size = UDim2.new(0, 65, 0, 65)
+					btn.BackgroundColor3 = Color3.fromRGB(35, 40, 50)
+					btn.Text = "" 
+					btn.LayoutOrder = 2 
+					applyStyle(btn)
+
+					local itemIcon = Instance.new("ImageLabel", btn)
+					itemIcon.Size = UDim2.new(0.8, 0, 0.8, 0)
+					itemIcon.Position = UDim2.new(0.1, 0, 0.1, 0)
+					itemIcon.BackgroundTransparency = 1
+					itemIcon.Image = item.TextureId
+					btn.Parent = qScroll
+
+					btn.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton2 then
+							activeCtxItem = item
+							btnEquip.Text = "Equip"
+							local mouseLoc = UserInputService:GetMouseLocation()
+							ctxMenu.Position = UDim2.new(0, mouseLoc.X, 0, mouseLoc.Y - 36)
+							ctxBlocker.Visible = true
+							ctxMenu.Visible = true
+						end
+					end)
+				end
+			end
+		end
+
+		-- Přidáme prázdné sloty pro vyplnění (zvětšeno na 28 slotů díky většímu oknu)
+		for i = slotCount + 1, 28 do
+			local s = Instance.new("Frame")
+			s.BackgroundColor3 = Color3.fromRGB(22, 25, 32)
+			s.LayoutOrder = 10 
+			applyStyle(s)
+			s.Parent = qScroll
+		end
+	end
+
+
+
+	-- ==========================================
+	-- 5. AKCE PRO KONTEXTOVÉ MENU
+	-- ==========================================
+	btnEquip.MouseButton1Click:Connect(function()
+		local char = player.Character
+		local humanoid = char and char:FindFirstChild("Humanoid")
+		if activeCtxItem and humanoid then
+			if btnEquip.Text == "Equip" then
+				humanoid:EquipTool(activeCtxItem)
+				updateGearEvent:FireServer("Weapon", activeCtxItem.Name)
+			elseif btnEquip.Text == "Unequip" then
+				humanoid:UnequipTools()
+				updateGearEvent:FireServer("Weapon", "")
+			end
+			closeCtxMenu()
+			triggerUIRefresh()
+		end
+	end)
+
+	btnDrop.MouseButton1Click:Connect(function()
+		if activeCtxItem then
+			local char = player.Character
+			local humanoid = char and char:FindFirstChild("Humanoid")
+			if humanoid and activeCtxItem.Parent == char then
+				humanoid:UnequipTools()
+				updateGearEvent:FireServer("Weapon", "") 
+			end
+			dropItem(activeCtxItem)
+			closeCtxMenu()
+			triggerUIRefresh()
+		end
+	end)
+
+	-- Tahle funkce umožní v hlavním skriptu zavolat překreslení inventáře
+	return {
+		triggerRefresh = triggerUIRefresh,
+		quickInvFrame = quickInvFrame
+	}
+end
+
+return InventoryManager
