@@ -11,6 +11,7 @@ local pGui = player:WaitForChild("PlayerGui")
 local PlayerModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
 
 local updateGearEvent = ReplicatedStorage:WaitForChild("UpdateGearEvent")
+local inventoryReady = false
 
 local blur = Lighting:FindFirstChild("MenuBlur") or Instance.new("BlurEffect")
 blur.Name = "MenuBlur"
@@ -27,7 +28,7 @@ local function applyStyle(ui)
 end
 
 -- ==========================================
--- 1. HLAVN� MENU (P)
+-- 1. HLAVNÍ MENU (P)
 -- ==========================================
 local menuGui = Instance.new("ScreenGui")
 menuGui.Name = "PlayerMenuGui"
@@ -151,7 +152,7 @@ end
 
 local spacer = Instance.new("Frame", statsFrame) spacer.Size = UDim2.new(1,0,0,10) spacer.BackgroundTransparency = 1
 statLabels.MaxHealth = createStatRow("Max Health")
-statLabels.HealthRegen = createStatRow("HealthRegen")
+statLabels.HealthRegen = createStatRow("Health Regen")
 statLabels.MaxMana = createStatRow("Max Mana")
 statLabels.ManaRegen = createStatRow("Mana Regen")
 statLabels.Strength = createStatRow("Strength")
@@ -161,8 +162,8 @@ statLabels.CritDamage = createStatRow("Crit Damage")
 local function updateStats()
 	local s = player:FindFirstChild("RPGStats")
 	if s then
-		statLabels.MaxHealth.Text = s:FindFirstChild("MaxHealth") and tostring(s.MaxHealth.Value) or "0"
 		statLabels.HealthRegen.Text = s:FindFirstChild("HealthRegen") and tostring(s.HealthRegen.Value) or "0"
+		statLabels.MaxHealth.Text = s:FindFirstChild("MaxHealth") and tostring(s.MaxHealth.Value) or "0"
 		statLabels.MaxMana.Text = s:FindFirstChild("MaxMana") and tostring(s.MaxMana.Value) or "0"
 		statLabels.ManaRegen.Text = s:FindFirstChild("ManaRegen") and tostring(s.ManaRegen.Value) or "0"
 		statLabels.Strength.Text = s:FindFirstChild("Strength") and tostring(s.Strength.Value) or "0"
@@ -326,7 +327,7 @@ grid.Parent = scroll
 
 
 -- ==========================================
--- 2. RYCHL� INVENT�� (HUD - I)
+-- 2. RYCHLÝ INVENTÁŘ (HUD - I)
 -- ==========================================
 local quickInvGui = Instance.new("ScreenGui")
 quickInvGui.Name = "QuickInventoryGui"
@@ -334,9 +335,9 @@ quickInvGui.ResetOnSpawn = false
 quickInvGui.DisplayOrder = 90
 quickInvGui.Parent = pGui
 
--- Hlavn� kontejner invent��e
+-- Hlavní kontejner inventáře
 local quickInvFrame = Instance.new("Frame")
-quickInvFrame.Size = UDim2.new(0, 320, 0, 480) -- V�t�� a prostorn�j��
+quickInvFrame.Size = UDim2.new(0, 320, 0, 480) -- Větší a prostornější
 quickInvFrame.Position = UDim2.new(1, -20, 1, -20)
 quickInvFrame.AnchorPoint = Vector2.new(1, 1)
 quickInvFrame.BackgroundColor3 = Color3.fromRGB(20, 23, 29)
@@ -345,7 +346,7 @@ quickInvFrame.Visible = false
 quickInvFrame.Parent = quickInvGui
 applyStyle(quickInvFrame)
 
--- Hlavi�ka, za kterou se to d� tahat
+-- Hlavička, za kterou se to dá tahat
 local qTopBar = Instance.new("Frame")
 qTopBar.Size = UDim2.new(1, 0, 0, 45)
 qTopBar.BackgroundColor3 = Color3.fromRGB(15, 17, 22)
@@ -353,7 +354,7 @@ qTopBar.BorderSizePixel = 0
 qTopBar.Parent = quickInvFrame
 Instance.new("UICorner", qTopBar).CornerRadius = UDim.new(0, 8)
 
--- Tento r�me�ek zarovn� spodek hlavi�ky, aby nem�la dole zakulacen� rohy a spojila se se zbytkem
+-- Tento rámeček zarovná spodek hlavičky, aby neměla dole zakulacené rohy a spojila se se zbytkem
 local qTopBarFix = Instance.new("Frame")
 qTopBarFix.Size = UDim2.new(1, 0, 0, 10)
 qTopBarFix.Position = UDim2.new(0, 0, 1, -10)
@@ -388,7 +389,7 @@ qScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 qScroll.Parent = quickInvFrame
 
 local qGrid = Instance.new("UIGridLayout")
-qGrid.CellSize = UDim2.new(0, 65, 0, 65) -- V�t�� ikony
+qGrid.CellSize = UDim2.new(0, 65, 0, 65) -- Větší ikony
 qGrid.CellPadding = UDim2.new(0, 8, 0, 8)
 qGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 qGrid.SortOrder = Enum.SortOrder.LayoutOrder
@@ -399,7 +400,7 @@ qPadding.PaddingTop = UDim.new(0, 5)
 
 
 -- ==========================================
--- DRAG LOGIKA PRO RYCHL� INVENT�� (P�esouv�n� okna)
+-- DRAG LOGIKA PRO RYCHLÝ INVENTÁŘ (Přesouvání okna)
 -- ==========================================
 local draggingQInv = false
 local qInvDragStart = nil
@@ -415,7 +416,7 @@ end)
 
 
 -- ==========================================
--- 3. GLOB�LN� KONTEXTOV� MENU (PRAV� TLA��TKO)
+-- 3. GLOBÁLNÍ KONTEXTOVÉ MENU (PRAVÉ TLAČÍTKO)
 -- ==========================================
 local ctxGui = Instance.new("ScreenGui")
 ctxGui.Name = "ContextMenuGui"
@@ -673,7 +674,7 @@ RefreshQuickInventoryUI = function()
 		end
 	end
 
-	-- P�id�me pr�zdn� sloty pro vypln�n� (zv�t�eno na 28 slot� d�ky v�t��mu oknu)
+	-- Přidáme prázdné sloty pro vyplnění (zvětšeno na 28 slotů díky většímu oknu)
 	for i = slotCount + 1, 28 do
 		local s = Instance.new("Frame")
 		s.BackgroundColor3 = Color3.fromRGB(22, 25, 32)
@@ -684,7 +685,7 @@ RefreshQuickInventoryUI = function()
 end
 
 -- ==========================================
--- 5. AKCE PRO KONTEXTOV� MENU
+-- 5. AKCE PRO KONTEXTOVÉ MENU
 -- ==========================================
 btnEquip.MouseButton1Click:Connect(function()
 	local char = player.Character
@@ -717,7 +718,7 @@ btnDrop.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- 6. HL�DA� GLOB�LN�CH INPUT� (Drag item�, rotace okna a posun UI)
+-- 6. HLÍDAČ GLOBÁLNÍCH INPUTŮ (Drag itemů, rotace okna a posun UI)
 -- ==========================================
 local function releaseDrag(mx, my)
 	if not dragGhost then return end
@@ -758,7 +759,7 @@ midFrame.InputBegan:Connect(function(i)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	-- P�esun itemu ve velk�m menu
+	-- Přesun itemu ve velkém menu
 	if dragGhost and (input.UserInputType == Enum.UserInputType.MouseMovement) then
 		local mouseLoc = UserInputService:GetMouseLocation()
 		dragGhost.Position = UDim2.new(0, mouseLoc.X - 30, 0, mouseLoc.Y - 30)
@@ -771,7 +772,7 @@ UserInputService.InputChanged:Connect(function(input)
 		lastXRot = input.Position.X
 	end
 
-	-- P�esun rychl�ho invent��e po obrazovce
+	-- Přesun rychlého inventáře po obrazovce
 	if draggingQInv and input.UserInputType == Enum.UserInputType.MouseMovement then
 		local delta = input.Position - qInvDragStart
 		quickInvFrame.Position = UDim2.new(
@@ -784,7 +785,7 @@ end)
 UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		draggingRot = false
-		draggingQInv = false -- Zastav� p�esouv�n� invent��e
+		draggingQInv = false -- Zastaví přesouvání inventáře
 
 		if dragGhost then
 			local mouseLoc = UserInputService:GetMouseLocation()
@@ -823,13 +824,18 @@ equipSlots["Weapon"].Btn.InputBegan:Connect(function(input)
 end)
 
 -- ==========================================
--- 7. OVL�D�N� KL�VESAMI A BLOKOV�N� KAMERY
+-- 7. OVLÁDÁNÍ KLÁVESAMI A BLOKOVÁNÍ KAMERY
 -- ==========================================
 local function toggleMainMenu()
+	-- POJISTKA: Pokud se menu zavírá a data nejsou načtená, nepustíme skript dál k ukládání
+	if not menuGui.Enabled and not inventoryReady then
+		return 
+	end
+
 	menuGui.Enabled = not menuGui.Enabled
 
-	-- HL�DA�: P menu okam�it� nahl�s� sv�j nov� stav hr��i
-	game.Players.LocalPlayer:SetAttribute("PMenuOpen", menuGui.Enabled)
+	-- HLÍDAČ: nahlásíme stav menu pro ostatní systémy
+	player:SetAttribute("PMenuOpen", menuGui.Enabled)
 
 	local controls = PlayerModule:GetControls()
 	local mainCam = workspace.CurrentCamera
@@ -851,13 +857,21 @@ local function toggleMainMenu()
 	else
 		blur.Size = 0
 		controls:Enable()
-		mainCam.CameraType = Enum.CameraType.Custom 
+		mainCam.CameraType = Enum.CameraType.Custom -- OPRAVA: vracíme kameru hráči
+		if inventoryReady then
+			updateGearEvent:FireServer()
+		end
 		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true) end)
 		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end) 
 		for _, g in pairs(pGui:GetChildren()) do 
 			if g:IsA("ScreenGui") and g:GetAttribute("WasEnabled") then 
 				g.Enabled = true g:SetAttribute("WasEnabled", nil)
 			end 
+		end
+
+		-- UKLÁDÁNÍ: Pošleme data na server jen pokud už proběhl první načítací cyklus
+		if updateGearEvent and inventoryReady then
+			updateGearEvent:FireServer()
 		end
 	end
 end
@@ -875,13 +889,10 @@ end
 local function handleMenuInputs(actionName, inputState, inputObject)
 	if inputState == Enum.UserInputState.Begin then
 		if actionName == "ToggleMainMenu" then
-			-- OCHRANN� BLBOST: Pokud se sna�� zapnout P menu, ale K menu je otev�en�...
-			if not menuGui.Enabled and game.Players.LocalPlayer:GetAttribute("KMenuOpen") then
-				-- Skript propust� sign�l (Pass). D�ky tomu si K menu v�imne, �e jsi zm��kl P, 
-				-- a samo se zav�e. Ty pak jen zm��kne� P znovu a v klidu se otev�e.
+			-- SYNC: Pokud je otevřené K (Magic), propustíme signál (Pass), aby ho K mohlo zavřít
+			if not menuGui.Enabled and player:GetAttribute("KMenuOpen") then
 				return Enum.ContextActionResult.Pass
 			end
-
 			toggleMainMenu()
 		elseif actionName == "ToggleQuickInv" then
 			toggleQuickInv()
@@ -904,7 +915,7 @@ close.MouseButton1Click:Connect(toggleMainMenu)
 RunService.RenderStepped:Connect(function() if menuGui.Enabled then updateStats() end end)
 
 -- ==========================================
--- 8. AUTO-REFRESH A NA�TEN� GEARU ZE SERVERU
+-- 8. AUTO-REFRESH A NAČTENÍ GEARU ZE SERVERU
 -- ==========================================
 local function setupAutoRefresh()
 	local char = player.Character or player.CharacterAdded:Wait()
@@ -925,29 +936,46 @@ local function setupAutoRefresh()
 end
 
 local function autoEquipSavedGear()
-	local gearFolder = player:WaitForChild("EquippedGear", 10)
-	if not gearFolder then return end
+	-- 1. Počkáme na složku, ta se vytvoří hned
+	local gearFolder = player:WaitForChild("EquippedGear")
+	local weaponVal = gearFolder:WaitForChild("Weapon")
 
-	local savedWeapon = gearFolder:WaitForChild("Weapon").Value
-	if savedWeapon ~= "" then
-		task.spawn(function()
-			local backpack = player:WaitForChild("Backpack")
-			local tool = backpack:FindFirstChild(savedWeapon)
-			local attempts = 0
+	-- 2. Pokud je hodnota ještě prázdná, čekáme na signál od serveru, že ji zapsal
+	if weaponVal.Value == "" then
+		weaponVal:GetPropertyChangedSignal("Value"):Wait()
+	end
 
-			while not tool and attempts < 10 do
-				task.wait(0.5)
-				tool = backpack:FindFirstChild(savedWeapon)
-				attempts = attempts + 1
-			end
+	local targetName = weaponVal.Value
+	if targetName == "" then return end
 
+	local backpack = player:WaitForChild("Backpack")
+
+	-- 3. Pomocná funkce, která zbraň nasadí
+	local function tryEquip(item)
+		if item.Name == targetName and item:IsA("Tool") then
 			local char = player.Character or player.CharacterAdded:Wait()
-			local humanoid = char:WaitForChild("Humanoid")
-			local currentlyEquipped = char:FindFirstChildOfClass("Tool")
+			local hum = char:WaitForChild("Humanoid")
+			-- Krátká pauza (0.1s) je nutná jen kvůli engine Robloxu, aby postava zbraň "udržela"
+			task.wait(0.1) 
+			hum:EquipTool(item)
+			if triggerUIRefresh then triggerUIRefresh() end
+			return true -- Vrátíme true, že jsme úspěšně nasadili
+		end
+		return false
+	end
 
-			if tool and humanoid and not currentlyEquipped then
-				humanoid:EquipTool(tool)
-				triggerUIRefresh()
+	-- 4. Teď ta hlavní logika bez timingu:
+	-- Nejdřív zkusíme, jestli už tam zbraň náhodou není
+	local existingTool = backpack:FindFirstChild(targetName)
+	if existingTool then
+		tryEquip(existingTool)
+	else
+		-- Pokud tam není, skript se "připne" na batoh a číhá na přidaný předmět
+		local connection
+		connection = backpack.ChildAdded:Connect(function(child)
+			if tryEquip(child) then
+				-- Jakmile jsme tu správnou zbraň našli a nasadili, odpojíme poslech
+				connection:Disconnect() 
 			end
 		end)
 	end
@@ -956,7 +984,12 @@ end
 local function onCharacterSpawned()
 	setupAutoRefresh()
 	autoEquipSavedGear()
+	task.delay(1, function()
+		inventoryReady = true
+		triggerUIRefresh()
+	end)
 end
+
 
 player.CharacterAdded:Connect(onCharacterSpawned)
 if player.Character then onCharacterSpawned() end
